@@ -15,5 +15,23 @@
     "deep-diff": "^0.3.8",
     "js-yaml": "^3.8.4",
     "nodegit": "^0.18.3"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brunomorency/sampique.git"
+  },
+  "keywords": [
+    "lambda",
+    "serverless",
+    "serverless-application-model",
+    "SAM",
+    "AWS",
+    "deploy",
+    "deployment",
+    "cli"
+  ],
+  "bugs": {
+    "url": "https://github.com/brunomorency/sampique/issues"
+  },
+  "homepage": "https://github.com/brunomorency/sampique#readme"
 }
