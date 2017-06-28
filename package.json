@@ -1,0 +1,19 @@
+{
+  "name": "sampique",
+  "version": "0.2.0",
+  "description": "Deploy utility for AWS Serverless Application Model (SAM) based projects",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "bin": {
+    "sampique": "./deploy-local.js"
+  },
+  "author": "Bruno Morency <bruno@morency.me>",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "aws-sdk": "^2.77.0",
+    "deep-diff": "^0.3.8",
+    "js-yaml": "^3.8.4",
+    "nodegit": "^0.18.3"
+  }
+}
