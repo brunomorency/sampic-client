@@ -49,17 +49,38 @@ git.Repository.open(path.resolve('.git'))
     return { awsCF, config, template }
   } catch (e) {
     // Don't have a previous version of deployed template,
-    // fetch current template from CloudFormation stack
-    let params = {
-      StackName: config.stackName,
-      TemplateStage: 'Original'
-    }
-    return awsCF.getTemplate(params).promise()
-    .then(data => ({
-      awsCF,
-      config,
-      template: yaml.safeLoad(data.TemplateBody)
-    }))
+    // Check if the stack exists and fetch current template if so
+    return new Promise((resolve, reject) => {
+      let nextToken = null
+      do {
+        awsCF.listStacks({ NextToken: nextToken }, (err, data) => {
+          if (err) reject(err)
+          else {
+            if (data.StackSummaries.filter(s => s.StackName == config.StackName).length > 0) {
+              // fecth current template for the stack
+              awsCF.getTemplate({
+                StackName: config.stackName,
+                TemplateStage: 'Original'
+              }, (err, data) => {
+                if (err) reject(err)
+                else {
+                  resolve({
+                    awsCF,
+                    config,
+                    template: yaml.safeLoad(data.TemplateBody)
+                  })
+                }
+              })
+            } else if (data.NextToken) {
+              nextToken = data.NextToken
+            } else {
+              // the stack doesn't exist on CloudFormation
+              resolve({ awsCF, config, template: null })
+            }
+          }
+        })
+      } while (nextToken !== null)
+    })
   }
 
 })
@@ -90,19 +111,25 @@ git.Repository.open(path.resolve('.git'))
 
 })
 .then(({awsCF, config, templates}) => {
-  console.log('Comparing current stack template with template to deploy')
 
-  let changes = diff(templates.current, templates.packaged)
-  if (!changes || changes.length === 0) {
-    throw new Error(`Looks like there are no changes between ${config.template} and template currently deployed on stack ${config.stackName}.\nNothing left to do!`)
+  let stackUpdate = true
+  let changes
+
+  if (templates.current) {
+    console.log('Comparing current stack template with template to deploy')
+
+    changes = diff(templates.current, templates.packaged)
+    if (!changes || changes.length === 0) {
+      throw new Error(`Looks like there are no changes between ${config.template} and template currently deployed on stack ${config.stackName}.\nNothing left to do!`)
+    }
+
+    stackUpdate = changes.some(chg => (
+      chg.kind !== 'E' ||
+      chg.path[0] !== 'Resources' ||
+      chg.path[chg.path.length-1] !== 'CodeUri' ||
+      templates.current.Resources[chg.path[1]].Type.search(/^AWS::(Serverless|Lambda)::Function$/) === -1
+    ))
   }
-
-  let stackUpdate = changes.some(chg => (
-    chg.kind !== 'E' ||
-    chg.path[0] !== 'Resources' ||
-    chg.path[chg.path.length-1] !== 'CodeUri' ||
-    templates.current.Resources[chg.path[1]].Type.search(/^AWS::(Serverless|Lambda)::Function$/) === -1
-  ))
 
   if (stackUpdate) {
 
@@ -183,5 +210,6 @@ git.Repository.open(path.resolve('.git'))
   else console.log('Deploy failed')
 })
 .catch(err => {
-  console.log(err.message)
+  console.log('ERROR:')
+  console.log(`\t${err.message}`)
 })
