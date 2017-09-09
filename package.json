@@ -1,6 +1,6 @@
 {
   "name": "sampique",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Deploy utility for AWS Serverless Application Model (SAM) based projects",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
