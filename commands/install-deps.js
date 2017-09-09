@@ -38,8 +38,9 @@ module.exports = function run(cliOpts) {
     let pathToNodeLambdas = Object.keys(template.Resources)
     .filter(resourceLogicalId => {
       return (
-        template.Resources[resourceLogicalId].Type.search(/^AWS::(Serverless|Lambda)::Function$/) === 0 &&
-        template.Resources[resourceLogicalId].Properties.Runtime.search(/^nodejs/) === 0
+        template.Resources[resourceLogicalId].Type.search(/^AWS::Serverless::Function$/) === 0 &&
+        template.Resources[resourceLogicalId].Properties.Runtime.search(/^nodejs/) === 0 &&
+        template.Resources[resourceLogicalId].Properties.CodeUri.substr(0,5) != 's3://'
       )
     })
     .map(logicalId => {

@@ -1,18 +1,38 @@
-# sampique
+# SAMPIQUE
 Deploy utility for AWS Serverless Application Model (SAM) based projects that significantly speeds up time to deploy updates when the only change is the code of Lambda function and the rest of the stack is the same.
 
 It builds upon `aws cloudformation package` but will figure out if simply updating code of Lambda functions is enough or whether a complete `aws cloudformation deploy` is required.
 
-## install
+## Install
 Install this package globally.
 
 ```shell
 npm install -g sampique
 ```
 
-You need to have AWS CLI installed and available in the shell environment when you run this
+## usage
 
-## setup
+**Make sure yo have AWS CLI (version >= 1.11) installed and available in the shell environment.**
+
+Make sure your current working branch is the branch to deploy and simply run the `sampique` command from your project base directory. *Note that changes saved but not yet committed _will be bundled_ in the deployment*.
+
+```shell
+sampique [<options>] <command>
+```
+
+Two different commands can be executed: `deploy` and `install-deps`. Run `sampique help` for more info.
+
+### `install-deps`
+This will parse your CloudFormation template file (see configuration below) and look for resources of type `AWS::Serverless::Function` whose runtime is a version of `nodejs` and `CodeUri` isn't an s3 url. For each of these functions, it will execute `npm install --production` in the directory `CodeUri` points to.
+
+This is very useful when checking out a repo and you need to install npm packages on many functions. This does it in one single command.
+
+### `deploy`
+Packages your CloudFormation template using the `aws cloudformation package` command then deploys it to AWS. If the stack doesn't exist yet, it will create it. 
+
+Sampique will check if changes since the last deployment only impact lambda function code. If so, it will skip a full CloudFormation deploy and simply update lambda functions code (which is much faster)
+
+## Configuration Setup
 Create a `.sampique` directory at the base of your project and add a `config.json` file under it. CloudFormation templates packaged by the `aws cloudformation package` will also go under this directory. It is a good idea to add it to your `.gitignore`.
 
 The configuration file declares deployment parameters for git branches you want to deploy. For example, the config file defines deployment instructions when your working branch is `master` or `my-dev-branch`:
@@ -39,17 +59,14 @@ The configuration file declares deployment parameters for git branches you want 
 ```
 
 ### config parameters:
-- `profile` refers to a named profile under `~/.aws/credentials`. No need to define this if you'll use the default AWS profile
+- `profile` (optional) refers to a named profile under `~/.aws/credentials`. No need to define this if you'll use the default AWS profile
 - `region` is the AWS region your CloudFormation stack is deployed in
 - `template` is your SAM template file
 - `stackName` is the name of the CloudFormation stack this branch should be deployed to
 - `s3Bucket` is the bucket where artifacts (lambda function code, external swagger files, ...) are uploaded to
 - `capabilities` is used when running to the `aws cloudformation deploy` command. See AWS docs for more but usually, deploying SAM templates need at least `CAPABILITY_IAM` listed in there.
 
-## usage
-Make sure your current working branch is the branch to deploy and simply run the `sampique` command from your project base directory. **Note that changes that aren't committed are included in the package/deploy process**.
-
-### How it works
+## How it works
 The script goes through the following steps:
 
 1. Read from `.sampique/config.json`, figure out current git branch and look for instructions for that branch
