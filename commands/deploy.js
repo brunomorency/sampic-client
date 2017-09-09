@@ -1,7 +1,6 @@
 #! /usr/bin/env node
 'use strict'
 
-const git = require('nodegit')
 const AWS = require('aws-sdk')
 const path = require('path')
 const fs = require('fs')
@@ -9,82 +8,25 @@ const yaml = require('js-yaml')
 const { diff } = require('deep-diff')
 
 const packageConfigDir = '.sampique'
-const packageFullPath = path.resolve(packageConfigDir)
 const utils = require('./_utils')
 
 module.exports = function run(cliOpts) {
 
-  try {
-    var config = JSON.parse(fs.readFileSync(`${packageFullPath}/config.json`))
-  } catch(e) {
-    console.log(`Unable to read config from ${packageConfigDir}/config.json\nMake sure the config file is saved and that you run this command from the root of your project.`)
-    return Promise.reject(e)
-  }
-
-  return git.Repository.open(path.resolve('.git'))
-  .then(repo => repo.getCurrentBranch())
-  .then(branchRef => {
-    return new Promise((resolve, reject) => {
-
-      let branchName = branchRef.name().replace(/^refs\/heads\//,'')
-      if (branchName in config) {
-        console.log(`Using deploy config for current git branch (${branchName})`)
-        if ('profile' in config[branchName]) {
-          AWS.config.credentials = new AWS.SharedIniFileCredentials({profile: config[branchName].profile})
-        }
-        let cfg = config[branchName]
-        cfg._deployableTemplateFile = `${packageFullPath}/${cfg.stackName}-deployable-template.yaml`
-        resolve(cfg)
-      }
-      else reject(new Error(`No deployment configuration set for current git branch (${branchName})`))
-
-    })
-  })
+  return utils.getConfig(packageConfigDir)
   .then(config => {
+
+    if ('profile' in config) {
+      AWS.config.credentials = new AWS.SharedIniFileCredentials({ profile: config.profile })
+    }
+
     console.log('Retrieving current stack template')
     let awsCF = new AWS.CloudFormation({
       region: config.region
     })
-
-    try {
-      let template = yaml.safeLoad(fs.readFileSync(config._deployableTemplateFile, 'utf8'))
+    return utils.getCurrentStackTemplate(awsCF, config)
+    .then(template => {
       return { awsCF, config, template }
-    } catch (e) {
-      // Don't have a previous version of deployed template,
-      // Check if the stack exists and fetch current template if so
-      return new Promise((resolve, reject) => {
-        let nextToken = null
-        do {
-          awsCF.listStacks({ NextToken: nextToken }, (err, data) => {
-            if (err) reject(err)
-            else {
-              if (data.StackSummaries.filter(s => s.StackName == config.StackName).length > 0) {
-                // fetch current template for the stack
-                awsCF.getTemplate({
-                  StackName: config.stackName,
-                  TemplateStage: 'Original'
-                }, (err, data) => {
-                  if (err) reject(err)
-                  else {
-                    resolve({
-                      awsCF,
-                      config,
-                      template: yaml.safeLoad(data.TemplateBody)
-                    })
-                  }
-                })
-              } else if (data.NextToken) {
-                nextToken = data.NextToken
-              } else {
-                // the stack doesn't exist on CloudFormation
-                resolve({ awsCF, config, template: null })
-              }
-            }
-          })
-        } while (nextToken !== null)
-      })
-    }
-
+    })
   })
   .then(({awsCF, config, template}) => {
     console.log(`Packaging ${config.template} to a deployable template`)
@@ -103,8 +45,7 @@ module.exports = function run(cliOpts) {
     let previousStdOutLine = ''
     let uploadingToRE = new RegExp('^Uploading to ')
     return utils.run('aws', args, {}, {
-      stdout: (data) => {
-        let lines = data.toString().trim().split("\n")
+      stdout: (lines) => {
         lines.forEach(line => {
           if (line.search(uploadingToRE) === 0) {
             // printing out line about uploading resource to S3
@@ -126,7 +67,7 @@ module.exports = function run(cliOpts) {
           } else if (previousStdOutLine.search(uploadingToRE) === 0) {
             process.stdout.write(`\n`)
           } /*else {
-            if (options.verbose) console.log(`\t${line}`)
+            if (cliOpts.verbose) console.log(`\t${line}`)
           }*/
           previousStdOutLine = line
         })
@@ -153,8 +94,8 @@ module.exports = function run(cliOpts) {
       console.log('Comparing current stack template with template to deploy')
 
       changes = diff(templates.current, templates.packaged)
-      if ((!changes || changes.length === 0) && !options.force) {
-        throw new Error(`Looks like there are no changes between ${config.template} and template currently deployed on stack ${config.stackName}.\nNothing left to do!`)
+      if ((!changes || changes.length === 0) && !cliOpts.force) {
+        throw new Error(`Looks like there are no changes between ${config.template} and template currently deployed on stack ${config.stackName}.\nRun with --force option to deploy anyway.`)
       }
 
       stackUpdate = changes.some(chg => (
@@ -185,8 +126,7 @@ module.exports = function run(cliOpts) {
       }
 
       return utils.run('aws', args, {}, {
-        stdout: (data) => {
-          let lines = data.toString().trim().split("\n")
+        stdout: (lines) => {
           lines.forEach(line => { console.log(`\t${line}`) })
         }
       })
@@ -227,7 +167,7 @@ module.exports = function run(cliOpts) {
               S3Bucket: bucket,
               S3Key: key
             }
-            console.log(`\tupdating code for lambda function '${fn.PhysicalResourceId}'`)
+            console.log(`\tupdating code for lambda function ${fn.PhysicalResourceId}`)
             return awsLambda.updateFunctionCode(params).promise()
           }))
           .then(results => {

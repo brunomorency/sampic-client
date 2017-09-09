@@ -63,7 +63,7 @@ if (options.version) {
         header: 'Command List',
         content: [
           { name: 'help', summary: 'Display this help information.' },
-          { name: 'install-deps', summary: 'Runs \'npm install\' command for all Lambda functions defined in CloudFormation template file' },
+          { name: 'install-deps', summary: 'Runs \'npm install --production\' command for all Lambda functions defined in CloudFormation template file' },
           { name: 'deploy', summary: 'Packages CloudFormtion template and deploys to AWS' }
         ]
       }

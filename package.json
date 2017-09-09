@@ -12,6 +12,7 @@
   "license": "GPL-3.0",
   "dependencies": {
     "aws-sdk": "^2.111.0",
+    "cloudformation-schema-js-yaml": "^1.0.1",
     "command-line-args": "^4.0.7",
     "command-line-usage": "^4.0.1",
     "deep-diff": "^0.3.8",
