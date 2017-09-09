@@ -56,6 +56,9 @@ module.exports = function run(cliOpts) {
       })
       return Promise.resolve(aPath)
     }), Promise.resolve())
+    .then(() => {
+      return `All production packages installed on lambda functions defined in ${config.template}`
+    })
 
   })
 }
