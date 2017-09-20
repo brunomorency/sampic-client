@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 'use strict'
 
+
+let commands = ['help', 'install-deps', 'deploy']
+const packageInfo = require('./package.json')
+
+let { command, argv } = require('command-line-commands')([null].concat(commands))
 let options = require('command-line-args')([
   {
     name: 'version',
@@ -15,24 +20,21 @@ let options = require('command-line-args')([
     defaultValue: false
   },
   {
-    name: 'cmd',
+    name: 'stack',
     type: String,
-    defaultOption: true
+    defaultValue: null
   }
-])
+], { argv })
 
-if (options.version) {
-
+if (command === null && options.version) {
   console.log(require('./package.json').version)
-
+} else if (commands.indexOf(command) == -1) {
+  console.log(`Usage:\t${packageInfo.name} [<options>] [<command>] [<command-options>]\n\nTo see help text, you can run:\n\tsampique help`)
 } else {
 
-  let commands = ['install-deps', 'deploy']
-
-  if (options.cmd == 'help') {
+  if (command == 'help') {
 
     const getUsage = require('command-line-usage')
-    const packageInfo = require('./package.json')
     console.log(getUsage([
       {
         header: packageInfo.name.toUpperCase(),
@@ -40,7 +42,7 @@ if (options.version) {
       },
       {
         header: 'Synopsis',
-        content: `$ ${packageInfo.name} [<options>] <command>`
+        content: `$ ${packageInfo.name} [<options>] [<command>] [<command-options>]`
       },
       {
         header: 'Options',
@@ -50,12 +52,6 @@ if (options.version) {
             alias: 'v',
             type: Boolean,
             description: 'Output package version and terminate.'
-          },
-          {
-            name: 'force',
-            alias: 'f',
-            type: Boolean,
-            description: 'Force deployment to CloudFormation even if \'deploy\' command says there are no template changes.'
           }
         ]
       },
@@ -66,17 +62,28 @@ if (options.version) {
           { name: 'install-deps', summary: 'Runs \'npm install --production\' command for all Lambda functions defined in CloudFormation template file' },
           { name: 'deploy', summary: 'Packages CloudFormtion template and deploys to AWS' }
         ]
-      }
+      },
+      {
+        header: 'Command Options: \'deploy\'',
+        optionList: [
+          {
+            name: 'force',
+            alias: 'f',
+            type: Boolean,
+            description: 'Force deployment to CloudFormation even if \'deploy\' command says there are no template changes.'
+          },
+          {
+            name: 'stack',
+            typeLabel: '[underline]{stackName}',
+            description: 'If your branch\'s config lists multiple stacks, this identifies the stack key to deploy'
+          }
+        ]
+      },
     ]))
-
-  }
-  else if (commands.indexOf(options.cmd) == -1) {
-
-    console.log(`Usage:\tsampique [options] <command>\n\nTo see help text, you can run:\n\tsampique help`)
 
   } else {
 
-    require(`./commands/${options.cmd}`)(options)
+    require(`./commands/${command}`)(options)
     .then(message => {
       if (message) console.log(message)
     })

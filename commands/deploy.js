@@ -12,13 +12,11 @@ const utils = require('./_utils')
 
 module.exports = function run(cliOpts) {
 
-  return utils.getConfig(packageConfigDir)
+  return utils.getConfig(packageConfigDir, cliOpts)
   .then(config => {
-
     if ('profile' in config) {
       AWS.config.credentials = new AWS.SharedIniFileCredentials({ profile: config.profile })
     }
-
     console.log('Retrieving current stack template')
     let awsCF = new AWS.CloudFormation({
       region: config.region
@@ -94,16 +92,18 @@ module.exports = function run(cliOpts) {
       console.log('Comparing current stack template with template to deploy')
 
       changes = diff(templates.current, templates.packaged)
-      if ((!changes || changes.length === 0) && !cliOpts.force) {
-        throw new Error(`Looks like there are no changes between ${config.template} and template currently deployed on stack ${config.stackName}.\nRun with --force option to deploy anyway.`)
+      if (!changes || changes.length === 0) {
+        if (!cliOpts.force) {
+          throw new Error(`Looks like there are no changes between ${config.template} and template currently deployed on stack ${config.stackName}.\nRun with --force option to deploy anyway.`)
+        }
+      } else {
+        stackUpdate = changes.some(chg => (
+          chg.kind !== 'E' ||
+          chg.path[0] !== 'Resources' ||
+          chg.path[chg.path.length-1] !== 'CodeUri' ||
+          templates.current.Resources[chg.path[1]].Type.search(/^AWS::(Serverless|Lambda)::Function$/) === -1
+        ))
       }
-
-      stackUpdate = changes.some(chg => (
-        chg.kind !== 'E' ||
-        chg.path[0] !== 'Resources' ||
-        chg.path[chg.path.length-1] !== 'CodeUri' ||
-        templates.current.Resources[chg.path[1]].Type.search(/^AWS::(Serverless|Lambda)::Function$/) === -1
-      ))
     }
 
     if (stackUpdate) {
@@ -123,6 +123,10 @@ module.exports = function run(cliOpts) {
       ]
       if (config.profile && config.profile != 'default') {
         args = ['--profile', `${config.profile}`].concat(args)
+      }
+      if (config.stackParameters) {
+        args.push('--parameter-overrides')
+        args.push(...Object.keys(config.stackParameters).map(key => `${key}=${config.stackParameters[key]}`))
       }
 
       return utils.run('aws', args, {}, {

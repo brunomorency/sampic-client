@@ -3,6 +3,7 @@ const fs = require('fs')
 const yaml = require('js-yaml')
 const path = require('path')
 const git = require('nodegit')
+const prompt = require('prompt')
 
 module.exports = {
 
@@ -38,7 +39,7 @@ module.exports = {
     })
   },
 
-  getConfig: (configDir) => {
+  getConfig: (configDir, cliOpts={}) => {
 
     const fullPath = path.resolve(configDir)
     try {
@@ -55,6 +56,46 @@ module.exports = {
       if (branchName in configByBranch) {
         console.log(`Using config for current git branch: ${branchName}`)
         let cfg = configByBranch[branchName]
+
+        if ('stacks' in cfg) {
+          // config lists different stacks we can deploy to, make sure the stack keywords
+          // has been defined as CLI arg, prompt user if not
+          let definedStacks = Object.keys(cfg.stacks)
+          if (cliOpts.stack === null) {
+            return new Promise((resolve, reject) => {
+              prompt.message = `Which stack should be deployed?\n  ${definedStacks.map((s, i) => `(${i+1}) ${cfg.stacks[s].name}`).join('\n  ')}\n`
+              prompt.delimiter = ''
+              prompt.start()
+              prompt.get({
+                properties: {
+                  stackIndex: {
+                    description: 'Specify stack number: ',
+                    type: 'number',
+                  }
+                }
+              }, (err, promptEntry) => {
+                if (promptEntry.stackIndex > definedStacks.length || promptEntry.stackIndex < 1) {
+                  return reject(new Error(`Stack number ${promptEntry.stackIndex} isn't valid`))
+                }
+                let stackKey = definedStacks[promptEntry.stackIndex - 1]
+                cfg.stackName = cfg.stacks[stackKey].name
+                cfg.stackParameters = cfg.stacks[stackKey].parameters
+                cfg.template = cfg.stacks[stackKey].template
+                cfg._deployableTemplateFile = `${fullPath}/${cfg.stackName}-deployable-template.yaml`
+                delete cfg.stacks
+                resolve(cfg)
+              })
+            })
+          } else {
+            if (definedStacks.indexOf(cliOpts.stack) == -1) {
+              throw new Error(`Stack key '${cliOpts.stack}' not found in branch config.\nValid stack keys:\n  ${definedStacks.join('\n  ')}`)
+            }
+            cfg.stackName = cfg.stacks[cliOpts.stack].name
+            cfg.stackParameters = cfg.stacks[cliOpts.stack].parameters
+            cfg.template = cfg.stacks[cliOpts.stack].template
+            delete cfg.stacks
+          }
+        }
         cfg._deployableTemplateFile = `${fullPath}/${cfg.stackName}-deployable-template.yaml`
         return cfg
       }
