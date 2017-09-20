@@ -63,7 +63,7 @@ module.exports = {
           let definedStacks = Object.keys(cfg.stacks)
           if (cliOpts.stack === null) {
             return new Promise((resolve, reject) => {
-              prompt.message = `Which stack should be deployed?\n  ${definedStacks.map((s, i) => `(${i+1}) ${cfg.stacks[s].name}`).join('\n  ')}\n`
+              prompt.message = `Which stack?\n  ${definedStacks.map((s, i) => `(${i+1}) ${cfg.stacks[s].template} => ${cfg.stacks[s].name}`).join('\n  ')}\n`
               prompt.delimiter = ''
               prompt.start()
               prompt.get({

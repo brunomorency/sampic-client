@@ -79,6 +79,16 @@ if (command === null && options.version) {
           }
         ]
       },
+      {
+        header: 'Command Options: \'install-deps\'',
+        optionList: [
+          {
+            name: 'stack',
+            typeLabel: '[underline]{stackName}',
+            description: 'If your branch\'s config lists multiple stack templates, specify which one should sampique search for Lambda functions'
+          }
+        ]
+      }
     ]))
 
   } else {

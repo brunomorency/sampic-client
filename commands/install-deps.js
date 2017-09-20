@@ -13,7 +13,7 @@ const cfYamlSchema = require('cloudformation-schema-js-yaml')
 
 module.exports = function run(cliOpts) {
 
-  return utils.getConfig(packageConfigDir)
+  return utils.getConfig(packageConfigDir, cliOpts)
   .then(config => {
     if ('profile' in config) {
       AWS.config.credentials = new AWS.SharedIniFileCredentials({ profile: config.profile })
