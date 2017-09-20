@@ -108,9 +108,9 @@ Once you're config is set up with a `<branch>.stacks` option, `sampique deploy` 
 ```shell
 $ sampique deploy
 Using config for current git branch: master
-Which stack should be deployed?
-  (1) stack-A
-  (2) stack-B
+Which stack?
+  (1) stackA-template.yaml => stack-A
+  (2) stackB-template.yaml => stack-B
 Specify stack number:  
 ```
 
