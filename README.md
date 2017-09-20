@@ -90,7 +90,7 @@ If your application has more than one template deployed to different stacks, sam
       },
       "myStackB": {
         "template": "stackB-template.yaml",
-        "name": "stack-A"
+        "name": "stack-A",
         "parameters": {
           "ParameterKey1": "ParameterValue1",
           "ParameterKey2": "ParameterValue2"
@@ -105,7 +105,7 @@ If your application has more than one template deployed to different stacks, sam
 
 Once you're config is set up with a `<branch>.stacks` option, `sampique deploy` will list stack names and ask you which template you want to deploy:
 
-```shell
+```
 $ sampique deploy
 Using config for current git branch: master
 Which stack?
