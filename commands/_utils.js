@@ -112,35 +112,45 @@ module.exports = {
     } catch (e) {
       // Don't have a previous version of deployed template,
       // Check if the stack exists and fetch current template if so
-      return new Promise((resolve, reject) => {
-        let nextToken = null
-        do {
-          CFclient.listStacks({ NextToken: nextToken }, (err, data) => {
-            if (err) reject(err)
-            else {
-              if (data.StackSummaries.filter(s => s.StackName == config.StackName).length > 0) {
-                // fetch current template for the stack
-                CFclient.getTemplate({
-                  StackName: config.stackName,
-                  TemplateStage: 'Original'
-                }, (err, data) => {
-                  if (err) reject(err)
-                  else {
-                    resolve(yaml.safeLoad(data.TemplateBody))
-                  }
-                })
-              } else if (data.NextToken) {
-                nextToken = data.NextToken
-              } else {
-                // the stack doesn't exist on CloudFormation
-                resolve(null)
-              }
+
+      let processWithToken = (nextToken) => new Promise((resolve, reject) => {
+        CFclient.listStacks({ NextToken: nextToken }, (err, data) => {
+          if (err) reject(err)
+          else {
+            if (data.StackSummaries.filter(s => s.StackName == config.StackName).length > 0) {
+              // fetch current template for the stack
+              CFclient.getTemplate({
+                StackName: config.stackName,
+                TemplateStage: 'Original'
+              }, (err, data) => {
+                if (err) reject(err)
+                else {
+                  resolve(yaml.safeLoad(data.TemplateBody))
+                }
+              })
+            } else if (data.NextToken) {
+              nextToken = data.NextToken
+              resolve({ nextToken })
+            } else {
+              // the stack doesn't exist on CloudFormation
+              resolve(null)
             }
-          })
-        } while (nextToken !== null)
+          }
+        })
       })
+
+      let recursiveProcessWithToken = (token) => {
+        return processWithToken(token)
+        .then(result => {
+          if (result != null && typeof(result) == "object" && result.nextToken != null) {
+            return recursiveProcessWithToken(result.nextToken)
+          }
+
+          return result
+        })
+      }
+
+      return recursiveProcessWithToken(null)
     }
-
   }
-
 }
