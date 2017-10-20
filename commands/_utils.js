@@ -2,10 +2,10 @@ const { spawn } = require('child_process')
 const fs = require('fs')
 const yaml = require('js-yaml')
 const path = require('path')
-const git = require('nodegit')
+//const git = require('nodegit')
 const prompt = require('prompt')
 
-module.exports = {
+module.exports = _utils = {
 
   run: (cmd, args=[], opts={}, onData=null) => {
 
@@ -49,10 +49,13 @@ module.exports = {
       return Promise.reject(e)
     }
 
-    return git.Repository.open(path.resolve('.git'))
-    .then(repo => repo.getCurrentBranch())
-    .then(branchRef => {
-      let branchName = branchRef.name().replace(/^refs\/heads\//,'')
+    // return git.Repository.open(path.resolve('.git'))
+    // .then(repo => repo.getCurrentBranch())
+    // .then(branchRef => {
+    //   let branchName = branchRef.name().replace(/^refs\/heads\//,'')
+    return _utils.run('git',['status'])
+    .then(cmdOutput => cmdOutput[0].match(/^On branch (.*)$/i).pop())
+    .then(branchName => {
       if (branchName in configByBranch) {
         console.log(`Using config for current git branch: ${branchName}`)
         let cfg = configByBranch[branchName]
