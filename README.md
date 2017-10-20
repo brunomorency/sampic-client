@@ -12,7 +12,7 @@ npm install -g sampique
 
 ## usage
 
-**Make sure yo have AWS CLI (version >= 1.11) installed and available in the shell environment.**
+**Make sure you have AWS CLI (version >= 1.11) and git installed and available in the shell environment when running sampique.**
 
 Make sure your current working branch is the branch to deploy and simply run the `sampique` command from your project base directory. *Note that changes saved but not yet committed _will be bundled_ in the deployment*.
 
@@ -28,7 +28,7 @@ This will parse your CloudFormation template file (see configuration below) and 
 This is very useful when checking out a repo and you need to install npm packages on many functions. This does it in one single command.
 
 ### `deploy`
-Packages your CloudFormation template using the `aws cloudformation package` command then deploys it to AWS. If the stack doesn't exist yet, it will create it. 
+Packages your CloudFormation template using the `aws cloudformation package` command then deploys it to AWS. If the stack doesn't exist yet, it will create it.
 
 Sampique will check if changes since the last deployment only impact lambda function code. If so, it will skip a full CloudFormation deploy and simply update lambda functions code (which is much faster)
 
@@ -75,14 +75,13 @@ The configuration file declares deployment parameters for git branches you want 
 - `capabilities` is used when running to the `aws cloudformation deploy` command. See AWS docs for more but usually, deploying SAM templates need at least `CAPABILITY_IAM` listed in there.
 
 ### Application with multiple templates/stacks
-If your application has more than one template deployed to different stacks, sampique supports that but the configuration is a bit different. 
+If your application has more than one template deployed to different stacks, sampique supports that but the configuration is a bit different.
 
 ```json
 {
   "master": {
     "profile": "default",
     "region": "us-east-1",
-    "template": "app.yaml",
     "stacks": {
       "myStackA": {
         "template": "stackA-template.yaml",
