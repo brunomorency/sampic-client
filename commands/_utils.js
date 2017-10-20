@@ -15,13 +15,13 @@ module.exports = {
       let stdout = [], stderr = []
 
       proc.stdout.on('data', data => {
-        let lines = data.toString().trim().split("\n")
+        let lines = data.toString().trim().split('\n')
         stdout = stdout.concat(lines)
         if (onData && onData.stdout) onData.stdout(lines)
       })
       proc.stderr.on('data', data => {
-        let lines = data.toString().trim().split("\n")
-        stderr = stderr.concat(data.toString().trim().split("\n"))
+        let lines = data.toString().trim().split('\n')
+        stderr = stderr.concat(data.toString().trim().split('\n'))
         if (onData && onData.stderr) onData.stderr(lines)
       })
       proc.on('error', err => {
@@ -112,12 +112,34 @@ module.exports = {
     } catch (e) {
       // Don't have a previous version of deployed template,
       // Check if the stack exists and fetch current template if so
+      function _fetchStackList(callback, NextToken=null) {
+        let listParams = {
+          StackStatusFilter: [
+            'CREATE_IN_PROGRESS',
+            'CREATE_FAILED',
+            'CREATE_COMPLETE',
+            'ROLLBACK_IN_PROGRESS',
+            'ROLLBACK_FAILED',
+            'ROLLBACK_COMPLETE',
+            'UPDATE_IN_PROGRESS',
+            'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS',
+            'UPDATE_COMPLETE',
+            'UPDATE_ROLLBACK_IN_PROGRESS',
+            'UPDATE_ROLLBACK_FAILED',
+            'UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS',
+            'UPDATE_ROLLBACK_COMPLETE',
+            'REVIEW_IN_PROGRESS'
+          ]
+        }
+        if (NextToken) listParams.NextToken = NextToken
+        CFclient.listStacks(listParams, callback)
+      }
 
-      let processWithToken = (nextToken) => new Promise((resolve, reject) => {
-        CFclient.listStacks({ NextToken: nextToken }, (err, data) => {
+      return new Promise((resolve, reject) => {
+        function _onStackList(err, data) {
           if (err) reject(err)
           else {
-            if (data.StackSummaries.filter(s => s.StackName == config.StackName).length > 0) {
+            if (data.StackSummaries.filter(s => s.StackName == config.stackName).length > 0) {
               // fetch current template for the stack
               CFclient.getTemplate({
                 StackName: config.stackName,
@@ -129,28 +151,17 @@ module.exports = {
                 }
               })
             } else if (data.NextToken) {
-              nextToken = data.NextToken
-              resolve({ nextToken })
+              // stack not found yet but there are more
+              _fetchStackList(_onStackList, data.NextToken)
             } else {
               // the stack doesn't exist on CloudFormation
               resolve(null)
             }
           }
-        })
+        }
+
+        _fetchStackList(_onStackList)
       })
-
-      let recursiveProcessWithToken = (token) => {
-        return processWithToken(token)
-        .then(result => {
-          if (result != null && typeof(result) == "object" && result.nextToken != null) {
-            return recursiveProcessWithToken(result.nextToken)
-          }
-
-          return result
-        })
-      }
-
-      return recursiveProcessWithToken(null)
     }
   }
 }

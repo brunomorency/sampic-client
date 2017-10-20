@@ -54,7 +54,6 @@ module.exports = function run(cliOpts) {
           lines.forEach(line => { console.log(`\t${line}`) })
         }
       })
-      return Promise.resolve(aPath)
     }), Promise.resolve())
     .then(() => {
       return `All production packages installed on lambda functions defined in ${config.template}`
