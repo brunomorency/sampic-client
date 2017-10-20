@@ -18,6 +18,7 @@
     "command-line-usage": "^4.0.1",
     "deep-diff": "^0.3.8",
     "js-yaml": "^3.10.0",
+    "nodegit": "^0.20.3",
     "prompt": "^1.0.0"
   },
   "repository": {
