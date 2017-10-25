@@ -42,6 +42,8 @@ module.exports = _utils = {
   getConfig: (configDir, cliOpts={}) => {
 
     const fullPath = path.resolve(configDir)
+    const packagedTemplateFileSuffix = 'packaged-template'
+    const deployedTemplateFileSuffix = 'deployed-template'
     try {
       var configByBranch = JSON.parse(fs.readFileSync(`${fullPath}/config.json`))
     } catch(e) {
@@ -81,7 +83,8 @@ module.exports = _utils = {
                 cfg.stackName = cfg.stacks[stackKey].name
                 cfg.stackParameters = cfg.stacks[stackKey].parameters
                 cfg.template = cfg.stacks[stackKey].template
-                cfg._deployableTemplateFile = `${fullPath}/${cfg.stackName}-deployable-template.yaml`
+                cfg._packagedTemplateFile = `${fullPath}/${cfg.stackName}-${packagedTemplateFileSuffix}.yaml`
+                cfg._deployedTemplateFile = `${fullPath}/${cfg.stackName}-${deployedTemplateFileSuffix}.yaml`
                 delete cfg.stacks
                 resolve(cfg)
               })
@@ -93,11 +96,16 @@ module.exports = _utils = {
             cfg.stackName = cfg.stacks[cliOpts.stack].name
             cfg.stackParameters = cfg.stacks[cliOpts.stack].parameters
             cfg.template = cfg.stacks[cliOpts.stack].template
+            cfg._packagedTemplateFile = `${fullPath}/${cfg.stackName}-${packagedTemplateFileSuffix}.yaml`
+            cfg._deployedTemplateFile = `${fullPath}/${cfg.stackName}-${deployedTemplateFileSuffix}.yaml`
             delete cfg.stacks
+            return cfg
           }
+        } else {
+          cfg._packagedTemplateFile = `${fullPath}/${cfg.stackName}-${packagedTemplateFileSuffix}.yaml`
+          cfg._deployedTemplateFile = `${fullPath}/${cfg.stackName}-${deployedTemplateFileSuffix}.yaml`
+          return cfg
         }
-        cfg._deployableTemplateFile = `${fullPath}/${cfg.stackName}-deployable-template.yaml`
-        return cfg
       }
       else {
         throw new Error(`No deployment configuration set for current git branch (${branchName})`)
@@ -107,7 +115,7 @@ module.exports = _utils = {
 
   getCurrentStackTemplate: (CFclient, config) => {
     try {
-      let template = yaml.safeLoad(fs.readFileSync(config._deployableTemplateFile, 'utf8'))
+      let template = yaml.safeLoad(fs.readFileSync(config._deployedTemplateFile, 'utf8'))
       return Promise.resolve(template)
     } catch (e) {
       // Don't have a previous version of deployed template,
@@ -163,5 +171,14 @@ module.exports = _utils = {
         _fetchStackList(_onStackList)
       })
     }
+  },
+
+  getStackStatus: (CFclient, stackName) => {
+    return CFclient.describeStacks({ StackName: stackName })
+    .promise()
+    .then(data => {
+      let stackInfo = data.Stacks.find(s => s.StackName == stackName)
+      return (stackInfo && stackInfo.StackStatus) || null
+    })
   }
 }

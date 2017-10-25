@@ -27,14 +27,14 @@ module.exports = function run(cliOpts) {
     })
   })
   .then(({awsCF, config, template}) => {
-    console.log(`Packaging ${config.template} to a deployable template`)
+    console.log(`Packaging ${config.template} template`)
 
     let args = [
       '--region', config.region,
       'cloudformation', 'package',
       '--template-file', config.template,
       '--s3-bucket', config.s3Bucket || `${config.stackName}-lambda-artifacts`,
-      '--output-template-file', config._deployableTemplateFile
+      '--output-template-file', config._packagedTemplateFile
     ]
     if (config.profile && config.profile != 'default') {
       args = ['--profile', `${config.profile}`].concat(args)
@@ -64,9 +64,7 @@ module.exports = function run(cliOpts) {
             process.stdout.write(`\t${line}`)
           } else if (previousStdOutLine.search(uploadingToRE) === 0) {
             process.stdout.write(`\n`)
-          } /*else {
-            if (cliOpts.verbose) console.log(`\t${line}`)
-          }*/
+          }
           previousStdOutLine = line
         })
       }
@@ -77,7 +75,7 @@ module.exports = function run(cliOpts) {
         config,
         templates: {
           current: template,
-          packaged: yaml.safeLoad(fs.readFileSync(config._deployableTemplateFile, 'utf8'))
+          packaged: yaml.safeLoad(fs.readFileSync(config._packagedTemplateFile, 'utf8'))
         }
       }
     })
@@ -110,14 +108,14 @@ module.exports = function run(cliOpts) {
 
       // A full stack update is required since the new stack does more than a
       // simple lambda function code change. Issue and cloudformation deploy
-      // command with the deployable template
+      // command with the packaged template
 
       console.log(`Deploying template to CloudFormation stack ${config.stackName}`)
 
       let args = [
         '--region', config.region,
         'cloudformation', 'deploy',
-        '--template-file', config._deployableTemplateFile,
+        '--template-file', config._packagedTemplateFile,
         '--stack-name', config.stackName,
         '--capabilities', ...config.capabilities
       ]
@@ -134,7 +132,13 @@ module.exports = function run(cliOpts) {
           lines.forEach(line => { console.log(`\t${line}`) })
         }
       })
-      .then(stdout => true)
+      .then(stdout => _utils.getStackStatus(awsCF, config.stackName))
+      .then(status => {
+        return [
+          ['CREATE_COMPLETE','UPDATE_COMPLETE'].indexOf(status) != -1,
+          config
+        ]
+      })
 
     } else {
 
@@ -175,11 +179,14 @@ module.exports = function run(cliOpts) {
             return awsLambda.updateFunctionCode(params).promise()
           }))
           .then(results => {
-            return results.reduce((acc, r) => r && acc, true)
+            return [
+              results.reduce((acc, ufcReqData) => ufcReqData && acc, true),
+              config
+            ]
           })
           .catch(err => {
-            console.log('Failed to update lambda function code:')
-            console.error(err)
+            console.log('Failure while updating lambda function code')
+            throw err
           })
         }
       })
@@ -187,7 +194,12 @@ module.exports = function run(cliOpts) {
     }
 
   })
-  .then(success => {
-    return (success) ? 'Deploy completed' : 'Deploy failed'
+  .then(([success, config]) => {
+    if (success) {
+      // overwrite deployed template with packaged template
+      fs.renameSync(config._packagedTemplateFile, config._deployedTemplateFile)
+      return 'Deploy completed'
+    }
+    return 'Deploy failed'
   })
 }
