@@ -43,6 +43,9 @@ Sampique will check if changes since the last deployment only impact lambda func
 ### `help`
 Launches a bunch of flares pretty high up in the sky to signal you're in distress.
 
+### `init`
+Creates a sample `.sampique/config.json` file in the present directory (unless it already exists).
+
 ## Configuration Setup
 Create a `.sampique` directory at the base of your project and add a `config.json` file under it. CloudFormation templates packaged by the `aws cloudformation package` will also go under this directory. It is a good idea to add it to your `.gitignore`.
 
