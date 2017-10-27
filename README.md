@@ -1,7 +1,7 @@
 # SAMPIQUE
 Deploy utility for AWS Serverless Application Model (SAM) based projects that significantly speeds up time to deploy updates when the only change is the code of Lambda function and the rest of the stack is the same.
 
-It builds upon `aws cloudformation package` but will figure out if simply updating code of Lambda functions is enough or whether a complete `aws cloudformation deploy` is required.
+It builds upon `aws cloudformation package` but will figure out if simply updating code of Lambda functions or updating stack parameters is enough or whether a full `aws cloudformation deploy` is required.
 
 ## Install
 Install this package globally.
@@ -113,16 +113,20 @@ Which stack?
 Specify stack number:  
 ```
 
-Alternatively, you can use the stack key (`<branch>.stacks.<stackKey>`) from CLI to skip the prompt:
+Alternatively, you can use the stack key (`<branch>.stacks.<key>`) from CLI to skip the prompt:
 
 ```shell
 $ sampique deploy --stack myStackA
 ```
 
-## How it works
+## What actually happens when you run `sampique deploy`
 The script goes through the following steps:
 
-1. Read from `.sampique/config.json`, figure out current git branch and look for instructions for that branch
-1. Load the curent deployed template, either from a previously package template saved under `.sampique/` or from CloudFormation if none are found locally.
-1. Package your app by running `aws cloudformation package`. Output template files can be found under `.sampique` directory.
-1. Compare the new packaged template to the current deployed template. If the only changes are `CodeUri` properties for some Lambda functions, directly update the function code for these lambdas. If there are more changes, run `aws cloudformation deploy` to do a full stack update.
+1. Gets current git working branch and looks for corresponding settings in `.sampique/config.json`
+1. Based on the configured stack name, load the currently deployed template.
+1. Package your template by running `aws cloudformation package`. The output template file is saved as `.sampique/<STACK_NAME>-packaged-template.yaml`
+1. If no corresponding stack was found in CloudFormation, deploy the packaged template to create it. Otherwise, compare the new packaged template to the current stack template: 
+    - If the only difference is code updates for Lambda functions (stack parameters defined in the config haven't changed), simply update function code of those Lambdas. 
+    - If the packaged template is identical to the deployed stack template but stack parameters in the config are different, run `aws cloudformation update-stack` using the current template and specofying new parameter values.
+    - If there are more changes, run `aws cloudformation deploy` to do a full stack update.
+1. If all went well, rename `.sampique/<STACK_NAME>-packaged-template.yaml` as `.sampique/<STACK_NAME>-deployed-template.yaml` and we're done.
