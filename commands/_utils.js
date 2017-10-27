@@ -81,7 +81,7 @@ module.exports = _utils = {
                 }
                 let stackKey = definedStacks[promptEntry.stackIndex - 1]
                 cfg.stackName = cfg.stacks[stackKey].name
-                cfg.stackParameters = cfg.stacks[stackKey].parameters
+                cfg.stackParameters = cfg.stacks[stackKey].parameters || null
                 cfg.template = cfg.stacks[stackKey].template
                 cfg._packagedTemplateFile = `${fullPath}/${cfg.stackName}-${packagedTemplateFileSuffix}.yaml`
                 cfg._deployedTemplateFile = `${fullPath}/${cfg.stackName}-${deployedTemplateFileSuffix}.yaml`
@@ -94,7 +94,7 @@ module.exports = _utils = {
               throw new Error(`Stack key '${cliOpts.stack}' not found in branch config.\nValid stack keys:\n  ${definedStacks.join('\n  ')}`)
             }
             cfg.stackName = cfg.stacks[cliOpts.stack].name
-            cfg.stackParameters = cfg.stacks[cliOpts.stack].parameters
+            cfg.stackParameters = cfg.stacks[cliOpts.stack].parameters || null
             cfg.template = cfg.stacks[cliOpts.stack].template
             cfg._packagedTemplateFile = `${fullPath}/${cfg.stackName}-${packagedTemplateFileSuffix}.yaml`
             cfg._deployedTemplateFile = `${fullPath}/${cfg.stackName}-${deployedTemplateFileSuffix}.yaml`
@@ -173,11 +173,17 @@ module.exports = _utils = {
     }
   },
 
-  getStackStatus: (CFclient, stackName) => {
+  getStackDescription: (CFclient, stackName) => {
     return CFclient.describeStacks({ StackName: stackName })
     .promise()
     .then(data => {
-      let stackInfo = data.Stacks.find(s => s.StackName == stackName)
+      return data.Stacks.find(s => s.StackName == stackName) || null
+    })
+  },
+
+  getStackStatus: (CFclient, stackName) => {
+    return _utils.getStackDescription(CFclient, stackName)
+    .then(stackInfo => {
       return (stackInfo && stackInfo.StackStatus) || null
     })
   }
