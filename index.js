@@ -2,7 +2,7 @@
 'use strict'
 
 
-let commands = ['help', 'install-deps', 'deploy']
+let commands = ['help', 'init', 'install-deps', 'deploy']
 const packageInfo = require('./package.json')
 
 let { command, argv } = require('command-line-commands')([null].concat(commands))
@@ -59,6 +59,7 @@ if (command === null && options.version) {
         header: 'Command List',
         content: [
           { name: 'help', summary: 'Display this help information.' },
+          { name: 'init', summary: 'Generate an example config file if none exist.' },
           { name: 'install-deps', summary: 'Runs \'npm install --production\' command for all Lambda functions defined in CloudFormation template file' },
           { name: 'deploy', summary: 'Packages CloudFormtion template and deploys to AWS' }
         ]
@@ -98,7 +99,7 @@ if (command === null && options.version) {
       if (message) console.log(message)
     })
     .catch(err => {
-      console.log(`${err.message}`)
+      console.log(`${err.message || err}`)
     })
 
   }

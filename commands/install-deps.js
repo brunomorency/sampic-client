@@ -7,13 +7,12 @@ const fs = require('fs')
 const yaml = require('js-yaml')
 const { diff } = require('deep-diff')
 
-const packageConfigDir = '.sampique'
 const utils = require('./_utils')
 const cfYamlSchema = require('cloudformation-schema-js-yaml')
 
 module.exports = function run(cliOpts) {
 
-  return utils.getConfig(packageConfigDir, cliOpts)
+  return utils.getConfig(cliOpts)
   .then(config => {
     if ('profile' in config) {
       AWS.config.credentials = new AWS.SharedIniFileCredentials({ profile: config.profile })

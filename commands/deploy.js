@@ -7,7 +7,6 @@ const fs = require('fs')
 const yaml = require('js-yaml')
 const { diff } = require('deep-diff')
 
-const packageConfigDir = '.sampique'
 const utils = require('./_utils')
 const UPDATE_TYPES = {
   LAMBDA_FNS: 'lambdafns',
@@ -22,7 +21,7 @@ const OUTPUT_INDENT = ' - '
 
 module.exports = function run(cliOpts) {
 
-  return utils.getConfig(packageConfigDir, cliOpts)
+  return utils.getConfig(cliOpts)
   .then(config => {
     if ('profile' in config) {
       AWS.config.credentials = new AWS.SharedIniFileCredentials({ profile: config.profile })

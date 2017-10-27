@@ -10,6 +10,14 @@ Install this package globally.
 npm install -g sampique
 ```
 
+Generate a sample config file for your current git working branch:
+
+```shell
+cd <project_directory>
+sampique init
+```
+
+
 ## usage
 
 **Make sure you have AWS CLI (version >= 1.11) and git installed and available in the shell environment when running sampique.**

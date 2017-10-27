@@ -5,6 +5,8 @@ const path = require('path')
 const git = require('nodegit')
 const prompt = require('prompt')
 
+const CONFIG_DIR = '.sampique'
+
 module.exports = _utils = {
 
   run: (cmd, args=[], opts={}, onData=null) => {
@@ -39,22 +41,32 @@ module.exports = _utils = {
     })
   },
 
-  getConfig: (configDir, cliOpts={}) => {
+  getPathToConfig: () => {
+    return path.resolve(CONFIG_DIR)
+  },
 
-    const fullPath = path.resolve(configDir)
+  getCurrentGitBranch: () => {
+    return git.Repository.open(path.resolve('.git'))
+    .then(repo => repo.getCurrentBranch())
+    .then(branchRef => {
+      return branchRef.name().replace(/^refs\/heads\//,'')
+    })
+  },
+
+  getConfig: (cliOpts={}) => {
+
+    const fullPath = path.resolve(CONFIG_DIR)
     const packagedTemplateFileSuffix = 'packaged-template'
     const deployedTemplateFileSuffix = 'deployed-template'
     try {
       var configByBranch = JSON.parse(fs.readFileSync(`${fullPath}/config.json`))
     } catch(e) {
-      console.log(`Unable to read config from ${configDir}/config.json\nMake sure the config file is saved and that you run this command from the root of your project.`)
+      console.log(`Unable to read config from ${CONFIG_DIR}/config.json\nMake sure you are in the root of your project and run 'sampique init' to generate a sample config file.`)
       return Promise.reject(e)
     }
 
-    return git.Repository.open(path.resolve('.git'))
-    .then(repo => repo.getCurrentBranch())
-    .then(branchRef => {
-      let branchName = branchRef.name().replace(/^refs\/heads\//,'')
+    return _utils.getCurrentGitBranch()
+    .then(branchName => {
       if (branchName in configByBranch) {
         console.log(`Using config for current git branch: ${branchName}`)
         let cfg = configByBranch[branchName]
