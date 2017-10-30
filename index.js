@@ -97,6 +97,16 @@ if (command === null && options.version) {
     require(`./commands/${command}`)(options)
     .then(message => {
       if (message) console.log(message)
+      if (['deploy','install-deps'].indexOf(command) != -1) {
+        let timeForRepeat = 45*24*60*60*1000
+        let delayUntilFirst = 10*24*60*60*1000
+        require('./commands/_utils').announce(
+          'feedback',
+          `${String.fromCodePoint(128075)} Hi! Thanks for using sampique, I'm curious to learn more about the type\n   of project you use it for as well as things you wish sampique could do.\n   You can email me at bruno@morency.me.\n   (Don't worry, this won't show up every time)`,
+          timeForRepeat,
+          delayUntilFirst
+        )
+      }
     })
     .catch(err => {
       console.log(`${err.message || err}`)

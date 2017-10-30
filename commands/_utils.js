@@ -198,5 +198,28 @@ module.exports = _utils = {
     .then(stackInfo => {
       return (stackInfo && stackInfo.StackStatus) || null
     })
+  },
+
+  announce: (messageKey, message, noRepeatPeriod = 60*1000, delayUntilFirst = 0) => {
+    let announcementsFile = path.normalize(`${__dirname}/..`) + '/.announcements'
+    try {
+      let timestamps = JSON.parse(fs.readFileSync(announcementsFile))
+      let writeFile = false
+      if (!(messageKey in timestamps)) {
+        timestamps[messageKey] = (delayUntilFirst > 0) ? Date.now() - noRepeatPeriod + delayUntilFirst : 0
+        writeFile = true
+      }
+      if (timestamps[messageKey] + noRepeatPeriod < Date.now()) {
+        console.log(message)
+        timestamps[messageKey] = Date.now()
+        writeFile = true
+      }
+      if (writeFile) fs.writeFileSync(announcementsFile, JSON.stringify(timestamps))
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        fs.writeFileSync(announcementsFile, JSON.stringify({}))
+        return _utils.announce(messageKey, message, noRepeatPeriod, delayUntilFirst)
+      }
+    }
   }
 }
