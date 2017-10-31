@@ -1,41 +1,53 @@
 {
-  "name": "sampique",
-  "version": "0.6.0",
-  "description": "Deploy utility for AWS Serverless Application Model (SAM) based projects",
+  "name": "sampic",
+  "version": "0.7.0-rc.1",
+  "description": "Client for SamPic.cloud with useful utilities for AWS Serverless Application Model (SAM) based projects",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
-    "sampique": "./index.js"
+    "sampic": "./cli.js"
   },
   "author": "Bruno Morency <bruno@morency.me>",
   "license": "GPL-3.0",
   "dependencies": {
-    "aws-sdk": "^2.141.0",
+    "aws-sdk": "^2.181.0",
+    "chalk": "^2.3.0",
     "cloudformation-schema-js-yaml": "^1.0.1",
     "command-line-args": "^4.0.7",
     "command-line-commands": "^2.0.1",
-    "command-line-usage": "^4.0.1",
+    "command-line-usage": "^4.0.2",
     "deep-diff": "^0.3.8",
+    "email-validator": "^1.1.1",
+    "filesize": "^3.5.11",
     "js-yaml": "^3.10.0",
-    "prompt": "^1.0.0"
+    "prompt": "^1.0.0",
+    "word-wrap": "^1.2.3"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/brunomorency/sampique.git"
+    "url": "git+https://github.com/brunomorency/sampic-client.git"
   },
   "keywords": [
     "lambda",
+    "lambda-functions",
     "serverless",
     "serverless-application-model",
     "SAM",
     "AWS",
     "deploy",
     "deployment",
-    "cli"
+    "deploy-tool",
+    "cli",
+    "cloudformation",
+    "cloudformation-template",
+    "cloudformation",
+    "stack",
+    "sam-template"
   ],
   "bugs": {
-    "url": "https://github.com/brunomorency/sampique/issues"
+    "url": "https://github.com/brunomorency/sampic/issues"
   },
-  "homepage": "https://github.com/brunomorency/sampique#readme"
+  "homepage": "https://github.com/brunomorency/sampic#readme"
 }

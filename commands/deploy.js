@@ -1,321 +1,249 @@
-#! /usr/bin/env node
 'use strict'
 
-const AWS = require('aws-sdk')
 const path = require('path')
+const https = require('https')
+const url = require('url')
 const fs = require('fs')
-const yaml = require('js-yaml')
-const { diff } = require('deep-diff')
+const crypto = require('crypto')
+const filesize = require('filesize')
+const wrap = require('word-wrap')
+const chalk = require('chalk')
 
-const utils = require('./_utils')
-const UPDATE_TYPES = {
-  LAMBDA_FNS: 'lambdafns',
-  STACK_PARAMS: 'stack_params',
-  FULL_DEPLOY: 'full_deploy'
-}
-const CMD_SUCCESS_STATUSES = [
-  'CREATE_COMPLETE',
-  'UPDATE_COMPLETE'
-]
-const OUTPUT_INDENT = ' - '
+module.exports = function run(cmdOpts, core) {
 
-module.exports = function run(cliOpts) {
+  let sampicTokens = core.utils.getTokens()
 
-  return utils.getConfig(cliOpts)
+  if (sampicTokens.length == 0) {
+    let intro = []
+    intro.push(chalk.bold.underline('INTRODUCING SAMPIC.CLOUD'))
+    intro.push(`Since v0.7.0, the 'deploy' command triggers a build and deploy process on sampic.cloud, a hosted deployment service designed specifically for the AWS Serverless Application Model platform. Run 'sampic signup' for more information and to create an account.`)
+    intro.push(`Use the new 'deploy-local' command to do what 'deploy' did in prior versions.`)
+    intro.forEach(paragraph => {
+      core.utils.stdout(wrap(paragraph, { width: 80, indent: '' }), {mode:core.utils.STDOUT_MODES.PARAGRAPH})
+    })
+    return Promise.resolve(false)
+  }
+
+  return core.utils.getConfig(cmdOpts)
+
   .then(config => {
-    if ('profile' in config) {
-      AWS.config.credentials = new AWS.SharedIniFileCredentials({ profile: config.profile })
-    }
-    console.log('Retrieving current stack template')
-    let awsCF = new AWS.CloudFormation({
-      region: config.region
-    })
-    return utils.getCurrentStackTemplate(awsCF, config)
-    .then(template => {
-      return { awsCF, config, template }
-    })
+    core.utils.stdout('Packaging application',{level:1})
+    core.utils.stdout('Zipping code for upload',{level:2})
+    return _getCodeBundle(cmdOpts, core)
+    .then(bundleFile => ({ config, bundleFile }))
   })
-  .then(({awsCF, config, template}) => {
-    console.log(`Packaging ${config.template} template`)
 
-    let args = [
-      '--region', config.region,
-      'cloudformation', 'package',
-      '--template-file', config.template,
-      '--s3-bucket', config.s3Bucket || `${config.stackName}-lambda-artifacts`,
-      '--output-template-file', config._packagedTemplateFile
-    ]
-    if (config.profile && config.profile != 'default') {
-      args = ['--profile', `${config.profile}`].concat(args)
-    }
-
-    let previousStdOutLine = ''
-    let uploadingToRE = new RegExp('^Uploading to ')
-    return utils.run('aws', args, {}, {
-      stdout: (lines) => {
-        lines.forEach(line => {
-          if (line.search(uploadingToRE) === 0) {
-            // printing out line about uploading resource to S3
-            if (previousStdOutLine.search(uploadingToRE) === 0) {
-              // Previous line was also abot such progress, see if it's
-              // about the same resources
-              let lineParts = line.split(' ')
-              let prevLineParts = previousStdOutLine.split(' ')
-              if (lineParts[2] == prevLineParts[2]) {
-                // progress on same resource as previous line
-                process.stdout.clearLine();
-                process.stdout.cursorTo(0);
-              } else {
-                // first progress info on a resource
-                process.stdout.write(`\n`)
-              }
-            }
-            process.stdout.write(`${OUTPUT_INDENT}${line}`)
-          } else if (previousStdOutLine.search(uploadingToRE) === 0) {
-            process.stdout.write(`\n`)
-          }
-          previousStdOutLine = line
-        })
-      }
-    })
-    .then(stdout => {
-      return {
-        awsCF,
-        config,
-        templates: {
-          current: template,
-          packaged: yaml.safeLoad(fs.readFileSync(config._packagedTemplateFile, 'utf8'))
-        }
-      }
-    })
-
+  .then(({ config, bundleFile }) => {
+    // get remote bundle id along with pre-signed url to upload app code
+    core.utils.stdout('Getting upload destination',{level:2})
+    return core.apiClient.executions.getAppCodeUploadUrl()
+    .then(({body:uploadInfo}) => ({config, bundleFile, uploadInfo}))
   })
-  .then(({awsCF, config, templates}) => {
 
-    let stackChanges = null, updatedStackParams = null
-
-    function _getUpdatedStackParams() {
-      return utils.getStackDescription(awsCF, config.stackName)
-      .then(stackDescription => {
-        return Object.keys(config.stackParameters).filter(cfgParamKey => {
-          let currentParam = stackDescription.Parameters.find(p => p.ParameterKey == cfgParamKey)
-          return currentParam ? config.stackParameters[cfgParamKey] != currentParam.ParameterValue : true
-        })
-      })
-    }
+  .then(({ config, bundleFile, uploadInfo }) => {
+    let bundleSize = fs.statSync(bundleFile).size
+    core.utils.stdout(`Uploading application code (${filesize(bundleSize)})`,{level:2})
 
     return new Promise((resolve, reject) => {
-
-      if (cliOpts.force || templates.current === null) {
-        // Need to do a full stack deploy because user forced it or there is no
-        // existing stack on CloudFormation with the configured name
-        resolve(UPDATE_TYPES.FULL_DEPLOY)
-      } else {
-
-        console.log('Comparing current stack template with template to deploy')
-        stackChanges = diff(templates.current, templates.packaged)
-
-        if (Array.isArray(stackChanges) && stackChanges.length > 0) {
-
-          // Packaged template is different from current stack template.
-          // Check if there are template changes that aren't simply new code
-          // bundles for lambda fns
-
-          let notJustLambdas = stackChanges.some(chg => (
-            chg.kind !== 'E' ||
-            chg.path[0] !== 'Resources' ||
-            chg.path[chg.path.length-1] !== 'CodeUri' ||
-            templates.current.Resources[chg.path[1]].Type.search(/^AWS::(Serverless|Lambda)::Function$/) === -1
-          ))
-
-          if (notJustLambdas) {
-            // Need to do a full stack deploy because there have been changes
-            // other than lambda code bundles
-            resolve(UPDATE_TYPES.FULL_DEPLOY)
-          } else if (config.stackParameters) {
-            // The only changes between packaged template and current stack are
-            // lambda code bundles. However, if stack parameters in config have
-            // changed vs. current stack params, we'll do a full deploy anyway
-            _getUpdatedStackParams().then(changedParams => {
-              updatedStackParams = changedParams
-              resolve(updatedStackParams.length > 0 ? UPDATE_TYPES.FULL_DEPLOY : UPDATE_TYPES.LAMBDA_FNS)
-            })
-          } else {
-            // Stack has no parameters and the only changes between packaged
-            // template and current stack are lambda code bundles
-            resolve(UPDATE_TYPES.LAMBDA_FNS)
-          }
-
-        } else {
-
-          // Packaged template is identical to current stack template. Look for
-          // possible changes in stack parameters
-
-          if (config.stackParameters) {
-            // If stack parameters in config have changed vs. current stack
-            // we'll update the stack with those params. Otherwise, there's
-            // nothing to do.
-            _getUpdatedStackParams().then(changedParams => {
-              updatedStackParams = changedParams
-              resolve(updatedStackParams.length > 0 ? UPDATE_TYPES.STACK_PARAMS : null)
-            })
-          } else {
-            // Template is identical and stack has no parameters.
-            // Nothing to do!
-            resolve(null)
-          }
+      // upload code bundle to signed url returned by api
+      let _url = url.parse(uploadInfo.uploadUrl)
+      let options = {
+        hostname: _url.hostname,
+        path: _url.path,
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/zip',
+          'Content-Length': bundleSize
         }
-
       }
+      let req = https.request(options, res => {
+        let body = ''
+        res.on('data', chunk => { body += chunk })
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(res.statusCode)
+          } else {
+            reject(new Error(`Failed to upload application code`))
+          }
+        })
+      })
+      req.on('error', reject)
 
+      let stream = fs.ReadStream(bundleFile)
+      stream.on('data', data => {
+        return req.write(data)
+      })
+      stream.on('end', () => req.end())
+      stream.on('error', reject)
     })
-    .then(updateType => ({ awsCF, config, updateType, stackChanges, updatedStackParams }))
-
+    .then(statusCode => {
+      fs.unlinkSync(bundleFile)
+      return { config, uploadInfo }
+    })
   })
-  .then(({awsCF, config, updateType, stackChanges, updatedStackParams}) => {
 
-    switch (updateType) {
+  .then(({ config, uploadInfo }) => {
+    // get data key to encrypt AWS credentials of profile to be used for deployment
+    core.utils.stdout(`Preparing deploy config`,{level:2})
+    return core.apiClient.executions.getCredentialsDataKey()
+    .then(({body:dataKey}) => {
+      let iv = crypto.randomBytes(16)
+      let cipher = crypto.createCipheriv('aes-256-ctr', Buffer.from(dataKey.plaintext,'base64'), iv)
 
-      case UPDATE_TYPES.FULL_DEPLOY: {
+      let credentials = { accessKeyId: '', secretAccessKey: '' }
 
-        // A full stack update is required since the new stack does more than a
-        // simple lambda function code change. Issue and cloudformation deploy
-        // command with the packaged template
-
-        console.log(`Deploying template to CloudFormation stack ${config.stackName}`)
-
-        let args = [
-          '--region', config.region,
-          'cloudformation', 'deploy',
-          '--template-file', config._packagedTemplateFile,
-          '--stack-name', config.stackName,
-          '--capabilities', ...config.capabilities
-        ]
-        if (config.profile && config.profile != 'default') {
-          args = ['--profile', `${config.profile}`].concat(args)
+      if ('_awsCredentialsObject' in config) {
+        credentials.accessKeyId = config._awsCredentialsObject.accessKeyId,
+        credentials.secretAccessKey = config._awsCredentialsObject.secretAccessKey
+      } else {
+        // get default Credentials
+        let AWS = require('aws-sdk')
+        if (AWS.config.credentials == null) {
+          // no default AWS credentials and no profile defined in sampic config
+          throw new Error(`Can't find AWS credentials to use for deploy command`)
+        } else {
+          credentials.accessKeyId = AWS.config.credentials.accessKeyId,
+          credentials.secretAccessKey = AWS.config.credentials.secretAccessKey
         }
-        if (config.stackParameters) {
-          args.push('--parameter-overrides')
-          args.push(...Object.keys(config.stackParameters).map(key => `${key}=${config.stackParameters[key]}`))
-        }
-
-        return utils.run('aws', args, {}, {
-          stdout: (lines) => {
-            lines.forEach(line => { console.log(`${OUTPUT_INDENT}${line}`) })
-          }
-        })
-        .then(stdout => utils.getStackStatus(awsCF, config.stackName))
-        .then(status => {
-          return [
-            CMD_SUCCESS_STATUSES.indexOf(status) != -1,
-            config
-          ]
-        })
       }
 
-      case UPDATE_TYPES.LAMBDA_FNS: {
+      let encrypted = cipher.update(JSON.stringify(credentials))
+      encrypted = Buffer.concat([encrypted, cipher.final()])
 
-        // The only changes in the stack template are lambda function code bundles.
-        // We'll find physical uri of those lambda functions and issue a code update
-        // request pointing them to the bundle uploaded in S3 when we ran
-        // `aws cloudformation package`
+      return [
+        dataKey.ciphertext,
+        iv.toString('base64'),
+        encrypted.toString('base64')
+      ].join(':')
+    })
+    .then(credentials => ({ config, uploadInfo, credentials }))
+  })
 
-        console.log(`New template only has updates to Lambda function code. Retrieving resource information.`)
+  .then(({ config, uploadInfo, credentials }) => {
+    // POST branch config to API to initiate deployment with application
+    // code bundle that has just been uploaded
+    core.utils.stdout(`Launching remote build and deploy`,{level:2})
+    return core.apiClient.executions.launchExecution(uploadInfo.bundleId, config, credentials)
+  })
 
-        let params = {
-          StackName: config.stackName
-        }
-        return awsCF.listStackResources(params).promise()
-        .then(data => {
-          let fnsToUpdate = data.StackResourceSummaries.filter(r =>
-            stackChanges.findIndex(chg => chg.path[1] === r.LogicalResourceId) >= 0
-          )
-          if (fnsToUpdate.length < stackChanges.length) {
-            // To support super big stacks with templates exceeding 1MB, we'd need
-            // to recursively call listStackResources with data.NextToken.
-            //  ... some day, maybe :)
-            throw new Error('Your CloudFormation stack has too many resources!')
-          } else {
-
-            let awsLambda = new AWS.Lambda({
-              region: config.region
+  .then(({body:exec}) => {
+    core.utils.stdout(`Executing build and deploy`,{level:1})
+    let _printQueuedInfo = exec.queued
+    if (_printQueuedInfo) {
+      core.utils.stdout('Max concurrent execution reached, waiting for running executions to complete ...',{
+        level: 2,
+        mode: core.utils.STDOUT_MODES.START_LINE
+      })
+    }
+    return new Promise((resolve, reject) => {
+      let _progress = []
+      let _executionCompleted = false
+      let _stagePrettyNames = {
+        'build':
+          'Building lambda code bundles and packaging template',
+        'change-analysis':
+          'Comparing packaged template to template currently deployed on stack',
+        'update-lambda-functions':
+          'Updating code of Lambda functions',
+        'update-stack-parameters':
+          'Updating stack parameters',
+        'create-stack-change-set':
+          'Creating stack change set',
+        'execute-stack-change-set':
+          'Executing stack change set',
+      }
+      let _markStageAsComplete = (stage, updates) => {
+        // check if stage completed or failed and calculate time span
+        let stageStart = updates.find(u => u.stage == stage && u.status == 'started')
+        let stageEnd = updates.find(u => u.stage == stage && ['failed','completed'].indexOf(u.status) != -1)
+        let state = (stageEnd.status == 'completed') ? chalk.green('\u2714') : chalk.red('\u2716')
+        let timespan = ((stageEnd.time - stageStart.time) / 1000).toFixed(2)
+        core.utils.stdout(`${_stagePrettyNames[stage]} ${state} (${timespan}s)`, {level:2, mode:core.utils.STDOUT_MODES.OVERWRITE_LINE})
+        return stageEnd.status
+      }
+      let _interval = setInterval(() => {
+        core.apiClient.executions.getByName(exec.name)
+        .then(({body:info}) => {
+          if (_printQueuedInfo && info.started) {
+            _printQueuedInfo = false
+            core.utils.stdout(' ready',{
+              level:2,
+              mode: core.utils.STDOUT_MODES.CONTINUE_LINE
             })
-            return Promise.all(fnsToUpdate.map(fn => {
-              let [str, bucket, key] = stackChanges.find(chg => chg.path[1] === fn.LogicalResourceId).rhs.match(/^s3:\/\/(.*)\/(.*)$/)
-              let params = {
-                FunctionName: fn.PhysicalResourceId,
-                Publish: false,
-                S3Bucket: bucket,
-                S3Key: key
+          }
+          if (info.statusUpdates && !_executionCompleted) {
+            info.statusUpdates.forEach(u => {
+              if (u.stage === null && u.status == 'completed') {
+                clearInterval(_interval)
+                _executionCompleted = true
+                let endStatus = (_progress.length > 0) ? _markStageAsComplete(_progress.slice(-1),info.statusUpdates) : null
+                core.utils.stdout(`Deploy completed`)
+                core.utils.stdout(`For complete logs, run ${chalk.magenta(`sampic logs ${exec.name}`)}`)
+                resolve(true)
+              } else if (_progress.indexOf(u.stage) == -1) {
+                let endStatus = (_progress.length > 0) ? _markStageAsComplete(_progress.slice(-1),info.statusUpdates) : null
+                if (endStatus == 'failed') {
+                  clearInterval(_interval)
+                  _executionCompleted = true
+                  core.utils.stdout(`Deploy failed`)
+                  core.utils.stdout(`For complete logs, run ${chalk.magenta(`sampic logs ${exec.name}`)}`)
+                  resolve(true)
+                } else {
+                  _progress.push(u.stage)
+                  core.utils.stdout(_stagePrettyNames[u.stage] + ' ...', {level:2, mode:core.utils.STDOUT_MODES.START_LINE})
+                }
               }
-              console.log(`${OUTPUT_INDENT}updating code for lambda function ${fn.PhysicalResourceId}`)
-              return awsLambda.updateFunctionCode(params).promise()
-            }))
-            .then(results => {
-              return [
-                results.reduce((acc, ufcReqData) => ufcReqData && acc, true),
-                config
-              ]
-            })
-            .catch(err => {
-              console.log('Failure while updating lambda function code')
-              throw err
             })
           }
         })
-      }
-
-
-      case UPDATE_TYPES.STACK_PARAMS: {
-
-        // There are no template changes and all lambda functions have identical
-        // code bundle signatures. Only stack parameters have changed. Run a
-        // stack update to apply new parameter values
-
-        console.log(`Updating stack with new values for parameters: ${updatedStackParams.join(' ')}`)
-
-        let args = [
-          '--region', config.region,
-          'cloudformation', 'update-stack',
-          '--stack-name', config.stackName,
-          '--use-previous-template',
-          '--capabilities', ...config.capabilities
-        ]
-        if (config.profile && config.profile != 'default') {
-          args = ['--profile', `${config.profile}`].concat(args)
-        }
-
-        args.push('--parameters')
-        Object.keys(config.stackParameters).forEach(paramName => {
-          if (updatedStackParams.indexOf(paramName) == -1) {
-            args.push(`ParameterKey=${paramName},UsePreviousValue=True`)
-          } else {
-            args.push(`ParameterKey=${paramName},ParameterValue=${config.stackParameters[paramName]}`)
-          }
+        .catch(err => {
+          clearInterval(_interval)
+          reject(err)
         })
-
-        return utils.run('aws', args)
-        .then(stdout => utils.getStackStatus(awsCF, config.stackName))
-        .then(status => {
-          console.log(`${OUTPUT_INDENT}Stack status: ${status}`)
-          return [
-            status == 'UPDATE_IN_PROGRESS',
-            config
-          ]
-        })
-      }
-
-      default:
-      throw new Error(`Looks like there are no changes to deploy for stack ${config.stackName}.\nRun with --force option to deploy anyway.`)
-    }
+      }, 2000)
+    })
 
   })
-  .then(([success, config]) => {
-    if (success) {
-      // overwrite deployed template with packaged template
-      fs.renameSync(config._packagedTemplateFile, config._deployedTemplateFile)
-      return 'Deploy completed'
-    }
-    return 'Deploy failed'
-  })
+}
+
+function _getCodeBundle(cmdOpts, core) {
+
+  let cmdArgs = []
+  let buildId = Math.floor(Math.random() * Math.pow(16,6)).toString(16)
+  let bundleFile = path.resolve(`./.sampic/builds/${buildId}.zip`)
+
+  if (cmdOpts.staged) {
+
+    let _checkoutPrefix = `.sampic/builds/${buildId}/`
+
+    return core.utils.run('git', [
+      'checkout-index',
+      '-a',
+      `--prefix=${_checkoutPrefix}`
+    ])
+    .then(stdout => {
+      return core.utils.run(
+        'zip',
+        [ '-r', bundleFile, '.' ],
+        { cwd: path.resolve(`./${_checkoutPrefix}`) }
+      )
+    })
+    .then(stdout => {
+      return core.utils.rmdirSync(path.resolve(`./${_checkoutPrefix}`))
+    })
+    .then(stdout => bundleFile)
+
+  } else {
+    try {
+      fs.mkdirSync(path.resolve('.sampic/builds'))
+    } catch(e) { }
+    return core.utils.run('git', [
+      'archive',
+      '--format=zip',
+      `--output=.sampic/builds/${buildId}.zip`,
+      'HEAD'
+    ])
+    .then(stdout => bundleFile)
+
+  }
 }

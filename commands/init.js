@@ -1,22 +1,19 @@
-#! /usr/bin/env node
 'use strict'
 
 const AWS = require('aws-sdk')
 const path = require('path')
 const fs = require('fs')
 
-const utils = require('./_utils')
-
-module.exports = function run(cliOpts) {
+module.exports = function run(cliOpts, core) {
 
   return new Promise((resolve, reject) => {
-    let cfgPath = utils.getPathToConfig()
+    let cfgPath = core.utils.getPathToConfig(false)
     let cfgFileName = `${cfgPath}/config.json`
 
     try {
       fs.accessSync(cfgPath, fs.constants.W_OK)
     } catch (err) {
-      console.log(`creating ${cfgPath}`)
+      core.utils.stdout(`Creating ${cfgPath}`)
       if (err.code === 'ENOENT') fs.mkdirSync(cfgPath, 0o755)
       else reject(err)
     }
@@ -28,7 +25,7 @@ module.exports = function run(cliOpts) {
         return null
       }
 
-      resolve(utils.getCurrentGitBranch().then(branchName => {
+      resolve(core.utils.getCurrentGitBranch().then(branchName => {
         let sampleConfig = {
           master: {
             profile: 'default',
@@ -59,8 +56,10 @@ module.exports = function run(cliOpts) {
           }
         }
 
-        fs.writeSync(fd, JSON.stringify(sampleConfig,2,' '))
-        return `Sample config file created: ${cfgFileName}`
+        fs.writeSync(fd, JSON.stringify(sampleConfig,null,2))
+        return {
+          message: `Sample config file created: ${cfgFileName}`
+        }
       }))
     })
   })
