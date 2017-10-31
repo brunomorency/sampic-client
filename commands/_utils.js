@@ -2,7 +2,6 @@ const { spawn } = require('child_process')
 const fs = require('fs')
 const yaml = require('js-yaml')
 const path = require('path')
-const git = require('nodegit')
 const prompt = require('prompt')
 
 const CONFIG_DIR = '.sampique'
@@ -46,10 +45,9 @@ module.exports = _utils = {
   },
 
   getCurrentGitBranch: () => {
-    return git.Repository.open(path.resolve('.git'))
-    .then(repo => repo.getCurrentBranch())
-    .then(branchRef => {
-      return branchRef.name().replace(/^refs\/heads\//,'')
+    return _utils.run('git', ['status','-sb'])
+    .then(stdout => {
+      return stdout[0].match(/## (.*)\.{3}?/).pop()
     })
   },
 
