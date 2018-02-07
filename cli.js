@@ -99,8 +99,9 @@ if (commands.indexOf(command) >= 0) {
             (Array.isArray(opt.group) && opt.group.indexOf(command) >= 0) ||
             (Array.isArray(opt.group) && opt.group.indexOf('global') >= 0)
   })
+  let options
   try {
-    let options = require('command-line-args')(supportedOptions, { argv })
+    options = require('command-line-args')(supportedOptions, { argv })
   } catch (e) {
     switch (e.name) {
       case 'UNKNOWN_OPTION':
