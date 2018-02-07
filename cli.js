@@ -79,7 +79,7 @@ const OPTIONS = [
     type: String,
     defaultValue: null,
     defaultOption: true,
-    description: 'Run command for all paths in parallel. Faster but output doesn\'t have as much info',
+    description: 'Unique identification of execution to fetch logs for.',
     group: 'logs'
   }
 ]
@@ -99,7 +99,27 @@ if (commands.indexOf(command) >= 0) {
             (Array.isArray(opt.group) && opt.group.indexOf(command) >= 0) ||
             (Array.isArray(opt.group) && opt.group.indexOf('global') >= 0)
   })
-  let options = require('command-line-args')(supportedOptions, { argv })
+  try {
+    let options = require('command-line-args')(supportedOptions, { argv })
+  } catch (e) {
+    switch (e.name) {
+      case 'UNKNOWN_OPTION':
+      console.log(`Unknown option '${e.optionName}'`)
+      break
+
+      case 'UNKNOWN_VALUE':
+      console.log(`Unknown value '${e.value}'`)
+      break
+
+      case 'ALREADY_SET':
+      console.log(`Option '${e.optionName}' is set more than once`)
+      break
+
+      default:
+      console.log(`${e.name} error`)
+    }
+    process.exit(1)
+  }
 
   require(`./commands/${command}`)(options._all, core)
   .then(output => {
