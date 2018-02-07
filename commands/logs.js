@@ -5,7 +5,7 @@ const chalk = require('chalk')
 
 module.exports = function run(cmdOpts, core) {
 
-  let executionName = cmdOpts['execution-name']
+  let executionName = cmdOpts.executionName
   core.utils.stdout(`Loading logs for execution ${executionName} ...`, {level:0, mode:core.utils.STDOUT_MODES.START_LINE})
 
   return core.apiClient.executions.getLogs(executionName)

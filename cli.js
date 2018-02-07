@@ -101,7 +101,7 @@ if (commands.indexOf(command) >= 0) {
   })
   let options
   try {
-    options = require('command-line-args')(supportedOptions, { argv })
+    options = require('command-line-args')(supportedOptions, { argv, camelCase: true })
   } catch (e) {
     switch (e.name) {
       case 'UNKNOWN_OPTION':

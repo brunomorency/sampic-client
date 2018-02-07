@@ -13,7 +13,7 @@ module.exports = function run(cmdOpts, core) {
   .then(({config, template}) => {
     return core.deps.install(template, null, {
       parallel: cmdOpts.parallel,
-      includeDev: cmdOpts['include-dev']
+      includeDev: cmdOpts.includeDev
     })
     .then(success => ({config, template}))
   })
