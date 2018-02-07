@@ -28,23 +28,30 @@ Make sure your current working branch is the branch to deploy and simply run the
 sampic [<options>] [<command>] [<command-options>]
 ```
 
-Three different commands can be executed: `install-deps`, `deploy`, and `help`.
+The utility supports the following set of commands:
 
-### `install-deps`
-This will parse your CloudFormation template file (see configuration below) and look for resources of type `AWS::Serverless::Function` whose runtime is a version of `nodejs` and `CodeUri` isn't an s3 url. For each of these functions, it will execute `npm install --production` in the directory `CodeUri` points to.
+### Manage npm dependencies
 
-This is very useful when checking out a repo and you need to install npm packages on many functions. This does it in one single command.
+Command | Description 
+------- | -----------
+`deps-install` | Parses your CloudFormation template file (see configuration below) looking for resources of type `AWS::Serverless::Function` whose runtime is a version of `nodejs` and `CodeUri` isn't an s3 url. For each of these functions, it will execute `npm install --production` in the directory `CodeUri` points to.
+`deps-outdated` | Lists outdated npm packages for all nodejs functions found in your CLoudFormation template
+`deps-update` | Parses your CloudFormation template file (see configuration below) looking for resources of type `AWS::Serverless::Function` whose runtime is a version of `nodejs` and `CodeUri` isn't an s3 url. For each of these functions, it will execute `npm update --save` in the directory `CodeUri` points to.
 
-### `deploy`
-Packages your CloudFormation template using the `aws cloudformation package` command then deploys it to AWS. If the stack doesn't exist yet, it will create it.
+### Deploy updates
 
-Sampique will check if changes since the last deployment only impact lambda function code. If so, it will skip a full CloudFormation deploy and simply update lambda functions code (which is much faster)
+Command | Description 
+------- | -----------
+`deploy-local` | Packages your CloudFormation template using the `aws cloudformation package` command then deploys it to AWS. If the stack doesn't exist yet, it will create it. If changes since the last deployment only impact lambda function code, it will skip a full CloudFormation deploy and simply update lambda functions code (which is much faster).
+`deploy` | Bundles git HEAD commit and uploads it to your sampic.cloud account for remote build and deploy. Your Lambda code bundles are always built from dependencies listed in package-lock.json or package.json and installed within an Amazon Linux environment replicating the Lambda exection environment.
+`logs` | Get detailed logs from a deploy triggered with the `deploy` command
+`signup` | Creates your sampic.cloud account required for `deploy` and `logs` command to work
 
-### `help`
-Launches a bunch of flares pretty high up in the sky to signal you're in distress.
-
-### `init`
-Creates a sample `.sampic/config.json` file in the present directory (unless it already exists).
+### Other commands
+Command | Description 
+------- | -----------
+`help` | Launches a bunch of flares pretty high up in the sky to signal you're in distress.
+`init` | Creates a sample `.sampic/config.json` file in the present directory (unless it already exists).
 
 ## Configuration Setup
 Create a `.sampic` directory at the base of your project and add a `config.json` file under it. CloudFormation templates packaged by the `aws cloudformation package` will also go under this directory. It is a good idea to add it to your `.gitignore`.
@@ -113,7 +120,7 @@ If your application has more than one template deployed to different stacks, sam
 }
 ```
 
-Once you're config is set up with a `<branch>.stacks` option, `sampic deploy` will list stack names and ask you which template you want to deploy:
+Once you're config is set up with a `<branch>.stacks` option, commands parsing your CloudFormation template will list stack names and ask you which template you want to work with:
 
 ```
 $ sampic deploy
@@ -130,7 +137,7 @@ Alternatively, you can use the stack key (`<branch>.stacks.<key>`) from CLI to s
 $ sampic deploy --stack myStackA
 ```
 
-## What actually happens when you run `sampic deploy`
+## What actually happens when you run `deploy-local`
 The script goes through the following steps:
 
 1. Gets current git working branch and looks for corresponding settings in `.sampic/config.json`
