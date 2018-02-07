@@ -135,6 +135,7 @@ if (commands.indexOf(command) >= 0) {
         delayUntilFirst
       )
     }
+    core.utils.stdout(`${chalk.bold.yellow('WARNING:')} This package has been renamed to 'sampic'. Future improvements will only be available in the new 'sampic' package.`,{mode:core.utils.STDOUT_MODES.PARAGRAPH})
   })
   .catch(err => {
     if (err.message) {

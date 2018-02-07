@@ -10,7 +10,7 @@ module.exports = function run(cmdOpts, core) {
 
   console.log(getUsage([
     {
-      header: 'SAMPIC CLI',
+      header: 'SAMPIQUE',
       content: packageInfo.description
     },
     {

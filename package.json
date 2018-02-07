@@ -1,13 +1,13 @@
 {
-  "name": "sampic",
-  "version": "0.7.0-rc.2",
-  "description": "Client for SamPic.cloud with useful utilities for AWS Serverless Application Model (SAM) based projects",
+  "name": "sampique",
+  "version": "0.7.0",
+  "description": "[DEPRECATED] Package is now named 'sampic'",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
-    "sampic": "./cli.js"
+    "sampique": "./cli.js"
   },
   "author": "Bruno Morency <bruno@morency.me>",
   "license": "GPL-3.0",
@@ -47,7 +47,7 @@
     "sam-template"
   ],
   "bugs": {
-    "url": "https://github.com/brunomorency/sampic/issues"
+    "url": "https://github.com/brunomorency/sampic-client/issues"
   },
-  "homepage": "https://github.com/brunomorency/sampic#readme"
+  "homepage": "https://github.com/brunomorency/sampic-client#readme"
 }
