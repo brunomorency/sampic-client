@@ -22,7 +22,7 @@ module.exports = function run(config) {
 
   if (config.profile && config.profile != 'default') {
     args = ['--profile', `${config.profile}`].concat(args)
-  } else if ('_awsCredentialsObject' in config) {
+  } else if ('_awsCredentialsObject' in config && config._awsCredentialsObject !== null) {
     opts.env = {
       AWS_ACCESS_KEY_ID: config._awsCredentialsObject.accessKeyId,
       AWS_SECRET_ACCESS_KEY: config._awsCredentialsObject.secretAccessKey
