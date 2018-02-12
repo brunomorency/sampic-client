@@ -92,7 +92,7 @@ module.exports = function run(cmdOpts, core) {
 
       let credentials = { accessKeyId: '', secretAccessKey: '' }
 
-      if ('_awsCredentialsObject' in config) {
+      if ('_awsCredentialsObject' in config && config._awsCredentialsObject !== null) {
         credentials.accessKeyId = config._awsCredentialsObject.accessKeyId,
         credentials.secretAccessKey = config._awsCredentialsObject.secretAccessKey
       } else {
