@@ -87,16 +87,16 @@ Sampic goes through the following steps:
     - By default, it packages code as found in the latest git HEAD commit. Any changes that aren't committed are excluded. However, you can stage changes you want to deploy and run the command with `--staged` option to include those.
     - The config includes the AWS credentials of the profile so calls to AWS can be made on your behalf. The credentials are encrypted  on your box with a one-time encryption key *before* they're sent.
 1. On the hosted service:
-  1. Unzip the application code and look in the stack template for NodeJS lambda functions with npm dependencies
-  1. Install all NPM dependencies based on package-lock.json or package.json file
-  1. Prepare code bundles for all those lambda functions and packages the CloudFormation template using `aws cloudformation package`.
-  1. Compare the packaged template and the current stack template to find differences: 
-    - If the stack doesn't currently exist on CloudFormation, deploy the packaged template to create it.
-    - If the only differences are code updates for Lambda functions, simply update function code of those Lambdas.
-    - If the packaged template is identical to the deployed stack template but stack parameters in your config have changed, update the stack with updated parameter values.
-    - If there are more changes, create a change set on the stack and execute it.
+    1. Unzip the application code and look in the stack template for NodeJS lambda functions with npm dependencies
+    1. Install all NPM dependencies based on package-lock.json or package.json file
+    1. Prepare code bundles for all those lambda functions and packages the CloudFormation template using `aws cloudformation package`.
+    1. Compare the packaged template and the current stack template to find differences: 
+        - If the stack doesn't currently exist on CloudFormation, deploy the packaged template to create it.
+        - If the only differences are code updates for Lambda functions, simply update function code of those Lambdas.
+        - If the packaged template is identical to the deployed stack template but stack parameters in your config have changed, update the stack with updated parameter values.
+        - If there are more changes, create a change set on the stack and execute it.
 
-Steps 1 to 3 happen inside a Docker container running Amazon Linux and that container is used only once. Your build always happens in a fresh container. The service will cache lambda code bundles and their dependencies to speed up future builds. The cached data is stored in the S3 bucket defined in your sampic config so they remain under your control at all times.
+Steps 2.i-iii happen inside a Docker container running Amazon Linux and that container is used only once. Your build always happens in a fresh container. The service will cache lambda code bundles and their dependencies to speed up future builds. The cached data is stored in the S3 bucket defined in your sampic config so they remain under your control at all times.
 
 ### Advantages of running `deploy-local`
 
