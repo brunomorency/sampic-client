@@ -16,12 +16,6 @@ class ApiError extends Error {
 
 module.exports = (function () {
 
-  // test API
-  // const BASE_URL = url.parse('https://be83yk6bog.execute-api.us-east-2.amazonaws.com/prod')
-  // staging API
-  // const BASE_URL = url.parse('https://owelp5tqza.execute-api.us-east-2.amazonaws.com/prod')
-  // const BASE_URL = url.parse('https://api-staging.sampic.cloud')
-
   const BASE_URL = url.parse('https://api.sampic.cloud')
 
   function _newRequest({method, path, onComplete}, authToken='default') {
