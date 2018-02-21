@@ -1,10 +1,11 @@
 {
   "name": "sampic",
-  "version": "0.7.0-rc.3",
+  "version": "0.7.0-rc.4",
   "description": "Client for SamPic.cloud with useful utilities for AWS Serverless Application Model (SAM) based projects",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "scripts/post-install.js"
   },
   "bin": {
     "sampic": "./cli.js"
@@ -12,8 +13,8 @@
   "author": "Bruno Morency <bruno@morency.me>",
   "license": "GPL-3.0",
   "dependencies": {
-    "aws-sdk": "^2.190.0",
-    "chalk": "^2.3.0",
+    "aws-sdk": "^2.199.0",
+    "chalk": "^2.3.1",
     "cloudformation-schema-js-yaml": "^1.0.1",
     "command-line-args": "^5.0.2",
     "command-line-commands": "^2.0.1",
@@ -23,6 +24,7 @@
     "filesize": "^3.6.0",
     "js-yaml": "^3.10.0",
     "prompt": "^1.0.0",
+    "uuid": "^3.2.1",
     "word-wrap": "^1.2.3"
   },
   "repository": {

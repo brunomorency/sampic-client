@@ -16,9 +16,15 @@ class ApiError extends Error {
 
 module.exports = (function () {
 
+  // test API
+  // const BASE_URL = url.parse('https://be83yk6bog.execute-api.us-east-2.amazonaws.com/prod')
+  // staging API
+  // const BASE_URL = url.parse('https://owelp5tqza.execute-api.us-east-2.amazonaws.com/prod')
+  // const BASE_URL = url.parse('https://api-staging.sampic.cloud')
+
   const BASE_URL = url.parse('https://api.sampic.cloud')
 
-  function _newRequest({method, path, onComplete}, authTokenEmail='default') {
+  function _newRequest({method, path, onComplete}, authToken='default') {
     let options = Object.assign({}, BASE_URL ,{
       method: method || 'GET',
       path: `${BASE_URL.path}${path}`.replace(/^\/\//,'/'),
@@ -26,17 +32,12 @@ module.exports = (function () {
         'User-Agent': `sampic-cli/${PACKAGE_VERSION}`
       }
     })
-    if (authTokenEmail !== false) {
-      let tokens = utils.getTokens()
-      if (authTokenEmail == 'default') {
-        options.headers.Authorization = `Token ${tokens[0].token}`
+    if (authToken !== false) {
+      let tokenEntry = (authToken == 'default') ? utils.tokens.getDefault() : utils.tokens.get(authToken)
+      if (tokenEntry) {
+        options.headers.Authorization = `Token ${tokenEntry.token}`
       } else {
-        let tokenEntry = tokens.find(elm => elm.email == authTokenEmail)
-        if (tokenEntry) {
-          options.headers.Authorization = `Token ${tokenEntry.token}`
-        } else {
-          throw new Error(`No authorization token configured for ${authTokenEmail}.`)
-        }
+        throw new Error(`No authorization token configured for '${authToken}'.`)
       }
     }
     return https.request(options, res => {
@@ -44,7 +45,7 @@ module.exports = (function () {
       res.setEncoding('utf8')
       res.on('data', chunk => { body += chunk })
       res.on('end', () => {
-        res.body = (res.headers['content-type'] == 'application/json') ? JSON.parse(body) : body
+        res.body = (res.headers['content-type'] == 'application/json' && body.length > 0) ? JSON.parse(body) : body
         onComplete(res)
       })
     })
@@ -168,7 +169,8 @@ module.exports = (function () {
     },
 
     users: {
-      signup: (email) => {
+
+      signup: (email, uuid=null) => {
         return new Promise((resolve, reject) => {
           let _req = _newRequest({
             method: 'POST',
@@ -177,17 +179,67 @@ module.exports = (function () {
               if (res.statusCode == 201) {
                 resolve(res)
               } else {
-                reject(new ApiError(res.statusCode, res.headers, res.body.message || 'Error launching remote build and deploy'))
+                reject(new ApiError(res.statusCode, res.headers, res.body.message || 'Error signing up'))
               }
             }
           }, false)
           _req.on('error', err => {
             reject(new Error('Error sending request to create an account'))
           })
-          _req.write(JSON.stringify({ email }))
+          let body = { email }
+          if (uuid) body.uuid = uuid
+          _req.write(JSON.stringify(body))
           _req.end()
         })
       }
+
+    },
+
+    analytics: {
+
+      register: (uuid) => {
+        return new Promise((resolve, reject) => {
+          let _req = _newRequest({
+            method: 'POST',
+            path: '/analytics/clients',
+            onComplete: (res) => {
+              if (res.statusCode == 201) {
+                resolve(res)
+              } else {
+                reject(new ApiError(res.statusCode, res.headers, res.body.message || 'Error registering anonymous client'))
+              }
+            }
+          }, false)
+          _req.on('error', err => {
+            reject(new Error('Error sending request to register client for anonymous token'))
+          })
+          _req.write(JSON.stringify({ uuid }))
+          _req.end()
+        })
+      },
+
+      record: (command, opts={}) => {
+        if (utils.prefs.get().allowAnonymousUsageAnalytics === false) return Promise.resolve({})
+        return new Promise((resolve, reject) => {
+          let _req = _newRequest({
+            method: 'POST',
+            path: '/analytics/events',
+            onComplete: (res) => {
+              if (res.statusCode == 204) {
+                resolve(res)
+              } else {
+                reject(new ApiError(res.statusCode, res.headers, res.body.message || 'Error recording command'))
+              }
+            }
+          })
+          _req.on('error', err => {
+            reject(new Error('Error sending request to retrieve execution'))
+          })
+          _req.write(JSON.stringify([{ command, opts, ts: Date.now() }]))
+          _req.end()
+        })
+      }
+
     }
   }
 

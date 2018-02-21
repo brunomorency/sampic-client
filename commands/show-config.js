@@ -5,6 +5,8 @@ const chalk = require('chalk')
 
 module.exports = function run(cmdOpts, core) {
 
+  core.api.analytics.record('show-config',cmdOpts).then(r => {}).catch(err => {})
+
   let NUM_TABS_TO_VALUE = 3
   return core.utils.getConfig(cmdOpts)
   .then(config => {

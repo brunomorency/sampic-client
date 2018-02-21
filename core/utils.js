@@ -9,6 +9,8 @@ const chalk = require('chalk')
 const CONFIG_DIR = '.sampic'
 const TOKEN_DIR = `${os.homedir()}/.sampic`
 const TOKEN_FILE_NAME = 'tokens.json'
+const PREFS_DIR = `${os.homedir()}/.sampic`
+const PREFS_FILE_NAME = 'prefs.json'
 const CONFIG_DIR_LEGACY = '.sampique'
 
 class RunError extends Error {
@@ -316,27 +318,79 @@ module.exports = _utils = {
     })
   },
 
-  getTokens: () => {
-    try {
-      let tokens = JSON.parse(fs.readFileSync(`${TOKEN_DIR}/${TOKEN_FILE_NAME}`))
-      return (Array.isArray(tokens)) ? tokens : []
-    } catch(e) {
-      return []
+  tokens: {
+    get: (email=null) => {
+      try {
+        let tokens = JSON.parse(fs.readFileSync(`${TOKEN_DIR}/${TOKEN_FILE_NAME}`))
+        if (email) {
+          return (Array.isArray(tokens)) ? tokens.find(t => t.email == email) : null
+        } else {
+          return (Array.isArray(tokens)) ? tokens : []
+        }
+      } catch(e) {
+        return (email) ? null : []
+      }
+    },
+    getDefault: () => {
+      return _utils.tokens.get().find(t => t.default)
+    },
+    save: (email, token, setAsDefault=false) => {
+      let tokens = _utils.tokens.get()
+      if (tokens.length == 0) {
+        // make sure path where tokens are saved exists
+        try {
+          fs.mkdirSync(TOKEN_DIR)
+        } catch(e) { }
+      }
+
+      if (setAsDefault === true) {
+        // there can only be one default token
+        tokens = tokens.map(t => {
+          t.default = false
+          return t
+        })
+      }
+
+      let idx = tokens.findIndex(elm => elm.email == email)
+      if (idx >= 0) {
+        // edit existing token
+        tokens[idx].token = token
+        tokens[idx].default = setAsDefault === true
+      }
+      else {
+        // add new token to list
+        tokens.push({
+          email,
+          token,
+          default: setAsDefault === true
+        })
+      }
+      fs.writeFileSync(`${TOKEN_DIR}/${TOKEN_FILE_NAME}`, JSON.stringify(tokens, null, 2))
     }
   },
 
-  saveToken: (email, token) => {
-    let tokens = _utils.getTokens()
-    if (tokens.length == 0) {
-      // make sure path where tokens are saved exists
+  prefs: {
+    get: () => {
       try {
-        fs.mkdirSync(TOKEN_DIR)
-      } catch(e) { }
+        return JSON.parse(fs.readFileSync(`${PREFS_DIR}/${PREFS_FILE_NAME}`))
+      } catch(e) {
+        return {}
+      }
+    },
+    set: (newPrefs) => {
+      let prefs = _utils.prefs.get()
+      if (Object.keys(prefs).length == 0) {
+        // make sure path where prefs are saved exists
+        try {
+          fs.mkdirSync(PREFS_DIR)
+        } catch(e) { }
+      }
+      Object.assign(prefs, newPrefs)
+      fs.writeFileSync(`${PREFS_DIR}/${PREFS_FILE_NAME}`, JSON.stringify(prefs, null, 2))
+    },
+    getFilePath: () => {
+      return `${PREFS_DIR}/${PREFS_FILE_NAME}`
     }
-    let idx = tokens.findIndex(elm => elm.email == email)
-    if (idx >= 0) tokens[idx].token = token
-    else tokens.push({ email, token })
-    fs.writeFileSync(`${TOKEN_DIR}/${TOKEN_FILE_NAME}`, JSON.stringify(tokens, null, 2))
   },
 
   getWorkingStackTemplate: (config) => {
