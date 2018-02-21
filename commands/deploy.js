@@ -11,7 +11,7 @@ const chalk = require('chalk')
 
 module.exports = function run(cmdOpts, core) {
 
-  let sampicTokens = core.utils.getTokens()
+  let sampicTokens = core.utils.tokens.get()
 
   if (sampicTokens.length == 0) {
     let intro = []
@@ -23,6 +23,8 @@ module.exports = function run(cmdOpts, core) {
     })
     return Promise.resolve(false)
   }
+
+  core.api.analytics.record('deploy',cmdOpts).then(r => {}).catch(err => {})
 
   return core.utils.getConfig(cmdOpts)
 
@@ -36,7 +38,7 @@ module.exports = function run(cmdOpts, core) {
   .then(({ config, bundleFile }) => {
     // get remote bundle id along with pre-signed url to upload app code
     core.utils.stdout('Getting upload destination',{level:2})
-    return core.apiClient.executions.getAppCodeUploadUrl()
+    return core.api.executions.getAppCodeUploadUrl()
     .then(({body:uploadInfo}) => ({config, bundleFile, uploadInfo}))
   })
 
@@ -85,7 +87,7 @@ module.exports = function run(cmdOpts, core) {
   .then(({ config, uploadInfo }) => {
     // get data key to encrypt AWS credentials of profile to be used for deployment
     core.utils.stdout(`Preparing deploy config`,{level:2})
-    return core.apiClient.executions.getCredentialsDataKey()
+    return core.api.executions.getCredentialsDataKey()
     .then(({body:dataKey}) => {
       let iv = crypto.randomBytes(16)
       let cipher = crypto.createCipheriv('aes-256-ctr', Buffer.from(dataKey.plaintext,'base64'), iv)
@@ -123,7 +125,7 @@ module.exports = function run(cmdOpts, core) {
     // POST branch config to API to initiate deployment with application
     // code bundle that has just been uploaded
     core.utils.stdout(`Launching remote build and deploy`,{level:2})
-    return core.apiClient.executions.launchExecution(uploadInfo.bundleId, config, credentials)
+    return core.api.executions.launchExecution(uploadInfo.bundleId, config, credentials)
   })
 
   .then(({body:exec}) => {
@@ -162,7 +164,7 @@ module.exports = function run(cmdOpts, core) {
         return stageEnd.status
       }
       let _interval = setInterval(() => {
-        core.apiClient.executions.getByName(exec.name)
+        core.api.executions.getByName(exec.name)
         .then(({body:info}) => {
           if (_printQueuedInfo && info.started) {
             _printQueuedInfo = false

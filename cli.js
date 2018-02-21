@@ -89,7 +89,7 @@ if (commands.indexOf(command) >= 0) {
   let core = {
     OPTIONS_DEF: OPTIONS
   }
-  ;['deps','package','analyseChanges','utils','apiClient'].forEach(op => {
+  ;['deps','package','analyseChanges','utils','api'].forEach(op => {
     core[op] = require(`./core/${op}`)
   })
 

@@ -44,12 +44,12 @@ module.exports = function run(cmdOpts, core) {
   .then(email => {
     core.utils.stdout('Creating your account ...', {level:1, mode:core.utils.STDOUT_MODES.OWN_LINE})
     core.utils.stdout('Submitting email address', {level:2, mode:core.utils.STDOUT_MODES.TERMINATE_LINE})
-    return core.apiClient.users.signup(email)
+    return core.api.users.signup(email, core.utils.prefs.get().uuid)
   })
 
   .then(({body: account}) => {
     core.utils.stdout('Saving authentication token under home dir', {level:2, mode:core.utils.STDOUT_MODES.TERMINATE_LINE})
-    core.utils.saveToken(account.email, account.authorizationToken)
+    core.utils.tokens.save(account.email, account.authorizationToken, true)
 
     core.utils.stdout(`${String.fromCodePoint(127881)} Your account is ready!`, {level:0, mode:core.utils.STDOUT_MODES.OWN_LINE})
     core.utils.stdout(chalk.underline.bold('USAGE:'), {level:1, mode:core.utils.STDOUT_MODES.OWN_LINE})
