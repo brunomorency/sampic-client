@@ -18,6 +18,10 @@ if (tokens.length == 0) {
   // to obtain one for analytics purposes
 
   let uuid = generateUUID()
+  let prefs = core.utils.prefs.get()
+  if ('allowAnonymousUsageAnalytics' in prefs && prefs.allowAnonymousUsageAnalytics == false) {
+    process.exit(0)
+  }
   core.api.analytics.register(uuid)
   .then(response => {
     core.utils.tokens.save(null,response.body.authorizationToken,true)
