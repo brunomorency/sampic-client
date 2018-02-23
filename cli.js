@@ -122,7 +122,32 @@ if (commands.indexOf(command) >= 0) {
     process.exit(1)
   }
 
-  require(`./commands/${command}`)(options._all, core)
+  function _recordCommand(cmd, opts) {
+    let prefs = core.utils.prefs.get()
+    if (prefs.allowAnonymousUsageAnalytics !== false) {
+      let tokens = core.utils.tokens.get()
+      if (tokens.length == 0) {
+        let uuid = prefs.uuid
+        if (!uuid) {
+          uuid = require('uuid/v1')()
+          core.utils.prefs.set({uuid})
+        }
+        return core.api.analytics.register(uuid)
+        .then(response => {
+          core.utils.tokens.save(null,response.body.authorizationToken,true)
+          core.api.analytics.record(cmd,opts).then(r => {}).catch(err => {})
+        })
+      } else {
+        core.api.analytics.record(cmd,opts).then(r => {}).catch(err => {})
+      }
+    }
+    return Promise.resolve(true)
+  }
+
+  _recordCommand(command, options._all)
+  .then(() => {
+    return require(`./commands/${command}`)(options._all, core)
+  })
   .then(output => {
     if (output && output.message) core.utils.stdout(output.message,{mode:core.utils.STDOUT_MODES.PARAGRAPH})
     if (['deploy-local','deps-install','deps-outdated','deps-update'].indexOf(command) != -1) {

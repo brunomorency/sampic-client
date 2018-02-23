@@ -213,7 +213,6 @@ module.exports = (function () {
       },
 
       record: (command, opts={}) => {
-        if (utils.prefs.get().allowAnonymousUsageAnalytics === false) return Promise.resolve({})
         return new Promise((resolve, reject) => {
           let _req = _newRequest({
             method: 'POST',

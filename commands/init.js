@@ -6,8 +6,6 @@ const fs = require('fs')
 
 module.exports = function run(cliOpts, core) {
 
-  core.api.analytics.record('init',cmdOpts).then(r => {}).catch(err => {})
-
   return new Promise((resolve, reject) => {
     let cfgPath = core.utils.getPathToConfig(false)
     let cfgFileName = `${cfgPath}/config.json`

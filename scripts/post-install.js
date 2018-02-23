@@ -14,23 +14,15 @@ let paragraph = `Sampic gathers anonymous usage stats to help improve the tool. 
 
 if (tokens.length == 0) {
 
-  // install has no api tokens configured, register as anonymous client
-  // to obtain one for analytics purposes
+  // install has no api tokens configured, set client UUID to be used for
+  // anonymous usage stats
 
   let uuid = generateUUID()
-  let prefs = core.utils.prefs.get()
-  if ('allowAnonymousUsageAnalytics' in prefs && prefs.allowAnonymousUsageAnalytics == false) {
-    process.exit(0)
-  }
-  core.api.analytics.register(uuid)
-  .then(response => {
-    core.utils.tokens.save(null,response.body.authorizationToken,true)
-    core.utils.prefs.set({
-      uuid,
-      allowAnonymousUsageAnalytics: true
-    })
-    core.utils.stdout(wrap(paragraph, { width: 80, indent: '' }), {mode:core.utils.STDOUT_MODES.PARAGRAPH})
+  core.utils.prefs.set({
+    uuid,
+    allowAnonymousUsageAnalytics: true
   })
+  core.utils.stdout(wrap(paragraph, { width: 80, indent: '' }), {mode:core.utils.STDOUT_MODES.PARAGRAPH})
 
 } else {
 

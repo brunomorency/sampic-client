@@ -6,8 +6,6 @@ const getUsage = require('command-line-usage')
 
 module.exports = function run(cmdOpts, core) {
 
-  core.api.analytics.record('help',cmdOpts).then(r => {}).catch(err => {})
-
   const packageInfo = require('../package.json')
 
   console.log(getUsage([

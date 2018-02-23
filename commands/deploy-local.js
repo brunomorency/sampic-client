@@ -14,8 +14,6 @@ const CMD_SUCCESS_STATUSES = [
 
 module.exports = function run(cmdOpts, core) {
 
-  core.api.analytics.record('deploy-local',cmdOpts).then(r => {}).catch(err => {})
-
   return core.utils.getConfig(cmdOpts)
   .then(config => {
 

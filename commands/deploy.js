@@ -24,8 +24,6 @@ module.exports = function run(cmdOpts, core) {
     return Promise.resolve(false)
   }
 
-  core.api.analytics.record('deploy',cmdOpts).then(r => {}).catch(err => {})
-
   return core.utils.getConfig(cmdOpts)
 
   .then(config => {
