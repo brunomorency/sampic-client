@@ -7,8 +7,6 @@ const chalk = require('chalk')
 
 module.exports = function run(cmdOpts, core) {
 
-  core.api.analytics.record('signup',cmdOpts).then(r => {}).catch(err => {})
-
   return new Promise((resolve, reject) => {
     // ask for email address
     let intro = []

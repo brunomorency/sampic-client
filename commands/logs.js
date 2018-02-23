@@ -7,7 +7,6 @@ module.exports = function run(cmdOpts, core) {
 
   let executionName = cmdOpts.executionName
   core.utils.stdout(`Loading logs for execution ${executionName} ...`, {level:0, mode:core.utils.STDOUT_MODES.START_LINE})
-  core.api.analytics.record('logs',cmdOpts).then(r => {}).catch(err => {})
 
   return core.api.executions.getLogs(executionName)
   .then(({body}) => {
