@@ -1,6 +1,6 @@
 {
   "name": "sampic",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Client for SamPic.cloud with useful utilities for AWS Serverless Application Model (SAM) based projects",
   "main": "index.js",
   "scripts": {
