@@ -235,10 +235,18 @@ module.exports = _utils = {
         .then(branchName => {
           _utils.stdout(`Current git branch is ${chalk.bold(branchName)}`,{mode:_utils.STDOUT_MODES.OVERWRITE_LINE})
           if (branchName in configByBranch) {
+            // exact match for git branch in config always wins over wildcards
             resolve(configByBranch[branchName])
           }
           else {
-            return reject(new Error(`No deployment configuration set for current git branch`))
+            // support branch name with wildcards in config, first one
+            // to match wins
+            let mm = require('minimatch')
+            let branchConfigKey = Object.keys(configByBranch).find(branchKey => {
+              return mm(branchName, branchKey)
+            })
+            if (branchConfigKey) resolve(configByBranch[branchConfigKey])
+            else reject(new Error(`No deployment configuration set for current git branch`))
           }
         })
       })

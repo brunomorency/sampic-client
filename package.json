@@ -13,8 +13,8 @@
   "author": "Bruno Morency <bruno@morency.me>",
   "license": "GPL-3.0",
   "dependencies": {
-    "aws-sdk": "^2.199.0",
-    "chalk": "^2.3.1",
+    "aws-sdk": "^2.205.0",
+    "chalk": "^2.3.2",
     "cloudformation-schema-js-yaml": "^1.0.1",
     "command-line-args": "^5.0.2",
     "command-line-commands": "^2.0.1",
@@ -23,6 +23,7 @@
     "email-validator": "^1.1.1",
     "filesize": "^3.6.0",
     "js-yaml": "^3.10.0",
+    "minimatch": "^3.0.4",
     "prompt": "^1.0.0",
     "uuid": "^3.2.1",
     "word-wrap": "^1.2.3"
