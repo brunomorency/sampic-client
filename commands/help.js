@@ -28,7 +28,7 @@ module.exports = function run(cmdOpts, core) {
         { name: 'deps-update', summary: 'Runs \'npm update --save\' command for all nodejs Lambda functions defined in CloudFormation template file' },
         { name: 'deploy-local', summary: 'Packages CloudFormation template and deploys to AWS' },
         { name: 'deploy', summary: 'Bundles git HEAD commit and uploads it to your sampic.cloud account for remote build and deploy.' },
-        { name: 'logs [underline]{execution-name}', summary: 'Retrieves detailed logs for a build and deploy execution triggered with the \'deploy\' command.' },
+        { name: 'logs {underline execution-name}', summary: 'Retrieves detailed logs for a build and deploy execution triggered with the \'deploy\' command.' },
         { name: 'signup', summary: 'Signup to enable `deploy` command' }
       ]
     },

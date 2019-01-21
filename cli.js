@@ -38,7 +38,7 @@ const OPTIONS = [
     name: 'stack',
     type: String,
     defaultValue: null,
-    typeLabel: '[underline]{stackName}',
+    typeLabel: '{underline stackName}',
     description: 'If your config file lists multiple stacks, this identifies the stack key to work with.',
     group: 'global'
   },

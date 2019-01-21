@@ -4,7 +4,6 @@ const AWS = require('aws-sdk')
 const path = require('path')
 const fs = require('fs')
 const yaml = require('js-yaml')
-const { diff } = require('deep-diff')
 const chalk = require('chalk')
 
 const CMD_SUCCESS_STATUSES = [
