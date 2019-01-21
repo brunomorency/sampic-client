@@ -4,8 +4,7 @@
   "description": "Client for SamPic.cloud with useful utilities for AWS Serverless Application Model (SAM) based projects",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "scripts/post-install.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
     "sampic": "./cli.js"

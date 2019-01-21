@@ -11,9 +11,6 @@ let commands = [
   'deps-outdated',
   'deps-update',
   'deploy',
-  'deploy-local',
-  'logs',
-  'signup',
   'show-config'
 ]
 
@@ -47,15 +44,7 @@ const OPTIONS = [
     alias: 'f',
     type: Boolean,
     defaultValue: false,
-    description: 'Force deployment to CloudFormation even if \'deploy-local\' command says there are no template changes.',
-    group: 'deploy-local'
-  },
-  {
-    name: 'staged',
-    alias: 's',
-    type: Boolean,
-    defaultValue: false,
-    description: 'Include changes staged in your git index in the bundle uploaded to sampic.cloud',
+    description: 'Force deployment to CloudFormation even if \'deploy\' command says there are no template changes.',
     group: 'deploy'
   },
   {
@@ -89,7 +78,7 @@ if (commands.indexOf(command) >= 0) {
   let core = {
     OPTIONS_DEF: OPTIONS
   }
-  ;['deps','package','analyseChanges','utils','api'].forEach(op => {
+  ;['deps','package','analyseChanges','utils'].forEach(op => {
     core[op] = require(`./core/${op}`)
   })
 
@@ -122,40 +111,15 @@ if (commands.indexOf(command) >= 0) {
     process.exit(1)
   }
 
-  function _recordCommand(cmd, opts) {
-    let prefs = core.utils.prefs.get()
-    if (prefs.allowAnonymousUsageAnalytics !== false) {
-      let tokens = core.utils.tokens.get()
-      if (tokens.length == 0) {
-        let uuid = prefs.uuid
-        if (!uuid) {
-          uuid = require('uuid/v1')()
-          core.utils.prefs.set({uuid})
-        }
-        return core.api.analytics.register(uuid)
-        .then(response => {
-          core.utils.tokens.save(null,response.body.authorizationToken,true)
-          core.api.analytics.record(cmd,opts).then(r => {}).catch(err => {})
-        })
-      } else {
-        core.api.analytics.record(cmd,opts).then(r => {}).catch(err => {})
-      }
-    }
-    return Promise.resolve(true)
-  }
-
-  _recordCommand(command, options._all)
-  .then(() => {
-    return require(`./commands/${command}`)(options._all, core)
-  })
+  require(`./commands/${command}`)(options._all, core)
   .then(output => {
     if (output && output.message) core.utils.stdout(output.message,{mode:core.utils.STDOUT_MODES.PARAGRAPH})
-    if (['deploy-local','deps-install','deps-outdated','deps-update'].indexOf(command) != -1) {
+    if (['deploy','deps-install','deps-outdated','deps-update'].indexOf(command) != -1) {
       let timeForRepeat = 45*24*60*60*1000
       let delayUntilFirst = 10*24*60*60*1000
       core.utils.announce(
         'feedback',
-        `${String.fromCodePoint(128075)} Hi! Thanks for using sampic, I'm curious to learn more about the type\n   of project you use it for as well as things you wish sampic could do.\n   You can email me at bruno@mopolabs.com.\n   (Don't worry, this won't show up every time)`,
+        `${String.fromCodePoint(128075)} Hi! Thanks for using sampic, I'm curious to learn more about the type\n   of project you use it for as well as things you wish sampic could do.\n   You can email me at bruno@morency.me.\n   (Don't worry, this won't show up every time)`,
         timeForRepeat,
         delayUntilFirst
       )
