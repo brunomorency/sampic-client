@@ -6,6 +6,7 @@ const fs = require('fs')
 const chalk = require('chalk')
 
 function _deps(cmdArgs, template, hooks={}, parallel=false, onError=null, stdioMode=null) {
+  let { Globals: { Function: { Runtime: GlobalRuntime } = {} } = {} } = template;
 
   // Get list of unique local paths with code for lambda functions
   let pathToNodeLambdas = Array.from(
@@ -13,7 +14,7 @@ function _deps(cmdArgs, template, hooks={}, parallel=false, onError=null, stdioM
     .filter(resourceLogicalId => {
       return (
         template.Resources[resourceLogicalId].Type.search(/^AWS::Serverless::Function$/) === 0 &&
-        template.Resources[resourceLogicalId].Properties.Runtime.search(/^nodejs/) === 0 &&
+        (template.Resources[resourceLogicalId].Properties.Runtime || GlobalRuntime).search(/^nodejs/) === 0 &&
         template.Resources[resourceLogicalId].Properties.CodeUri.substr(0,5) != 's3://'
       )
     })
