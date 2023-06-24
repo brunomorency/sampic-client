@@ -1,7 +1,8 @@
 'use strict'
 
-const AWS = require('aws-sdk')
-const path = require('path')
+const { LambdaClient, UpdateFunctionCodeCommand } = require('@aws-sdk/client-lambda')
+const { CloudFormationClient, ListStackResourcesCommand, UpdateStackCommand } = require("@aws-sdk/client-cloudformation")
+const { fromIni } = require("@aws-sdk/credential-providers")
 const fs = require('fs')
 const yaml = require('js-yaml')
 const chalk = require('chalk')
@@ -19,11 +20,11 @@ module.exports = function run(cmdOpts, core) {
     let cfConfig = {
       region: config.region
     }
-    if (config._awsCredentialsObject) {
-      cfConfig.credentials = config._awsCredentialsObject
+    if (config.profile) {
+      cfConfig.credentials = fromIni({profile: config.profile})
     }
     core.utils.stdout(`Retrieving template currently deployed on stack ${chalk.bold(config.stackName)}`)
-    let awsCF = new AWS.CloudFormation(cfConfig)
+    let awsCF = new CloudFormationClient(cfConfig)
     return core.utils.getCurrentStackTemplate(awsCF, config)
     .then(template => {
       return { awsCF, config, template }
@@ -40,7 +41,7 @@ module.exports = function run(cmdOpts, core) {
         config,
         templates: {
           current: template,
-          packaged: yaml.safeLoad(
+          packaged: yaml.load(
             fs.readFileSync(config._packagedTemplateFile, 'utf8'),
             { schema: require('cloudformation-schema-js-yaml') }
           )
@@ -138,11 +139,11 @@ module.exports = function run(cmdOpts, core) {
         core.utils.stdout(`Updating Lambda functions`,{level:1})
         core.utils.stdout(`Retrieving information on stack resources`,{level:2})
 
-        let params = {
+        let cfCmd = new ListStackResourcesCommand({
           StackName: config.stackName
-        }
-        return awsCF.listStackResources(params).promise()
-        .then(data => {
+        })
+        return awsCF.send(cfCmd)
+        .then((data) => {
           let fnsToUpdate = data.StackResourceSummaries.filter(r =>
             stackChanges.findIndex(chg => chg.path[1] === r.LogicalResourceId) >= 0
           )
@@ -156,20 +157,20 @@ module.exports = function run(cmdOpts, core) {
             let lambdaConfig = {
               region: config.region
             }
-            if (config._awsCredentialsObject) {
-              lambdaConfig.credentials = config._awsCredentialsObject
+            if (config.profile) {
+              lambdaConfig.credentials = fromIni({profile: config.profile})
             }
-            let lambda = new AWS.Lambda(lambdaConfig)
+            let lambda = new LambdaClient(lambdaConfig)
             return Promise.all(fnsToUpdate.map(fn => {
               let [str, bucket, key] = stackChanges.find(chg => chg.path[1] === fn.LogicalResourceId).rhs.match(/^s3:\/\/(.*)\/(.*)$/)
-              let params = {
+              let lambdaCmd = new UpdateFunctionCodeCommand({
                 FunctionName: fn.PhysicalResourceId,
                 Publish: false,
                 S3Bucket: bucket,
                 S3Key: key
-              }
+              })
               core.utils.stdout(`Setting ${chalk.yellow(`s3://${bucket}/${key}`)} as code bundle for lambda function ${chalk.cyan(fn.PhysicalResourceId)}`,{level:2})
-              return lambda.updateFunctionCode(params).promise()
+              return lambda.send(lambdaCmd)
             }))
             .then(results => {
               return [
@@ -194,7 +195,7 @@ module.exports = function run(cmdOpts, core) {
 
         core.utils.stdout(`Updating stack with new values for parameters: ${updatedStackParams.join(' ')}`, {level:1})
 
-        let updateParams = {
+        let cfCmd = new UpdateStackCommand({
           StackName: config.stackName,
           Capabilities: config.capabilities,
           UsePreviousTemplate: true,
@@ -211,9 +212,9 @@ module.exports = function run(cmdOpts, core) {
               }
             }
           })
-        }
+        })
 
-        return awsCF.updateStack(updateParams).promise()
+        return awsCF.send(cfCmd)
         .then(data => core.utils.getStackStatus(awsCF, config.stackName))
         .then(status => {
           core.utils.stdout(`Stack status: ${status}`,{level:2})

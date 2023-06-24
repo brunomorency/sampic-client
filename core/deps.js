@@ -2,7 +2,6 @@
 
 const path = require('path')
 const utils = require('./utils')
-const fs = require('fs')
 const chalk = require('chalk')
 
 function _deps(cmdArgs, template, hooks={}, parallel=false, onError=null, stdioMode=null) {

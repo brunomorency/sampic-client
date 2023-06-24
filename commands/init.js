@@ -1,7 +1,5 @@
 'use strict'
 
-const AWS = require('aws-sdk')
-const path = require('path')
 const fs = require('fs')
 
 module.exports = function run(cliOpts, core) {

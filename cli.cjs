@@ -3,6 +3,8 @@
 
 const packageInfo = require('./package.json')
 const chalk = require('chalk')
+const commandLineCommands = require('command-line-commands')
+const commandLineArgs = require('command-line-args')
 
 let commands = [
   'help',
@@ -15,7 +17,7 @@ let commands = [
 ]
 
 try {
-  var { command, argv } = require('command-line-commands')([null].concat(commands))
+  var { command, argv } = commandLineCommands([null].concat(commands))
 } catch (e) {
   if (e.name == 'INVALID_COMMAND') {
     console.log(`Unknown command '${e.command}'`)
@@ -62,14 +64,6 @@ const OPTIONS = [
     defaultValue: false,
     description: 'Run command for all paths in parallel. Faster but output doesn\'t have as much info',
     group: ['deps-install','deps-update']
-  },
-  {
-    name: 'execution-name',
-    type: String,
-    defaultValue: null,
-    defaultOption: true,
-    description: 'Unique identification of execution to fetch logs for.',
-    group: 'logs'
   }
 ]
 
@@ -90,7 +84,7 @@ if (commands.indexOf(command) >= 0) {
   })
   let options
   try {
-    options = require('command-line-args')(supportedOptions, { argv, camelCase: true })
+    options = commandLineArgs(supportedOptions, { argv, camelCase: true })
   } catch (e) {
     switch (e.name) {
       case 'UNKNOWN_OPTION':
@@ -114,16 +108,6 @@ if (commands.indexOf(command) >= 0) {
   require(`./commands/${command}`)(options._all, core)
   .then(output => {
     if (output && output.message) core.utils.stdout(output.message,{mode:core.utils.STDOUT_MODES.PARAGRAPH})
-    if (['deploy','deps-install','deps-outdated','deps-update'].indexOf(command) != -1) {
-      let timeForRepeat = 45*24*60*60*1000
-      let delayUntilFirst = 10*24*60*60*1000
-      core.utils.announce(
-        'feedback',
-        `${String.fromCodePoint(128075)} Hi! Thanks for using sampic, I'm curious to learn more about the type\n   of project you use it for as well as things you wish sampic could do.\n   You can email me at bruno@morency.me.\n   (Don't worry, this won't show up every time)`,
-        timeForRepeat,
-        delayUntilFirst
-      )
-    }
   })
   .catch(err => {
     if (err.message) {
@@ -135,10 +119,11 @@ if (commands.indexOf(command) >= 0) {
   })
 
 } else {
-  let options = require('command-line-args')(OPTIONS.filter(opt => (opt.group == 'nocmd' || opt.group.indexOf('nocmd') >= 0)), { argv })
+  let options = commandLineArgs(OPTIONS.filter(opt => (opt.group == 'nocmd' || opt.group.indexOf('nocmd') >= 0)), { argv })
   if (command === null && options._all.version) {
     console.log(require('./package.json').version)
   } else {
-    console.log(`Usage:\t${packageInfo.name} [<options>] [<command>] [<command-options>]\n\nTo see help text, you can run:\n\tsampic help`)
+    let cmdName = Object.keys(packageInfo.bin)[0]
+    console.log(`Usage:\t${cmdName} [<options>] [<command>] [<command-options>]\n\nTo see help text, you can run:\n\t${cmdName} help`)
   }
 }

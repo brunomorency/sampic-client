@@ -2,16 +2,12 @@ const { spawn } = require('child_process')
 const fs = require('fs')
 const yaml = require('js-yaml')
 const path = require('path')
-const os = require('os')
 const prompt = require('prompt')
 const chalk = require('chalk')
 
+const { DescribeStacksCommand, GetTemplateCommand } = require("@aws-sdk/client-cloudformation")
+
 const CONFIG_DIR = '.sampic'
-const TOKEN_DIR = `${os.homedir()}/.sampic`
-const TOKEN_FILE_NAME = 'tokens.json'
-const PREFS_DIR = `${os.homedir()}/.sampic`
-const PREFS_FILE_NAME = 'prefs.json'
-const CONFIG_DIR_LEGACY = '.sampique'
 
 class RunError extends Error {
   constructor(exitCode, message) {
@@ -194,13 +190,16 @@ module.exports = _utils = {
     })
   },
 
-  getPathToConfig: (fallbackToLegacy) => {
-    if (fallbackToLegacy === false) return CONFIG_DIR
-    try {
-      fs.accessSync(path.resolve(CONFIG_DIR))
+  getPathToConfig: (onlyIfExists) => {
+    if (onlyIfExists === true) {
+      try {
+        fs.accessSync(path.resolve(CONFIG_DIR))
+        return CONFIG_DIR
+      } catch(e) {
+        return null
+      }
+    } else {
       return CONFIG_DIR
-    } catch(e) {
-      return CONFIG_DIR_LEGACY
     }
   },
 
@@ -226,8 +225,8 @@ module.exports = _utils = {
         try {
           var configByBranch = JSON.parse(fs.readFileSync(`${fullPath}/config.json`))
         } catch(e) {
-          _utils.stdout(chalk.red('Unable to read sampic config.'), {mode:_utils.STDOUT_MODES.OVERWRITE_LINE})
-          _utils.stdout(`Run 'sampic init' from your project root directory to generate a sample config file.`)
+          _utils.stdout(chalk.red('Unable to read config.'), {mode:_utils.STDOUT_MODES.OVERWRITE_LINE})
+          _utils.stdout(`Run with init command from your project root directory to generate a sample config file.`)
           return reject(e)
         }
 
@@ -250,18 +249,6 @@ module.exports = _utils = {
           }
         })
       })
-    }
-
-    function _initAwsCredentials(cfg) {
-      var AWS = require('aws-sdk')
-      if ('awsCredentials' in cmdOpts && cmdOpts.awsCredentials.accessKeyId && cmdOpts.awsCredentials.secretAccessKey) {
-        return new AWS.Credentials(cmdOpts.awsCredentials.accessKeyId, cmdOpts.awsCredentials.secretAccessKey)
-      }
-      else if ('profile' in cfg) {
-        return new AWS.SharedIniFileCredentials({ profile: cfg.profile })
-      } else {
-        return null
-      }
     }
 
     return _getBranchConfig()
@@ -299,7 +286,6 @@ module.exports = _utils = {
               cfg.template = cfg.stacks[stackKey].template
               cfg._packagedTemplateFile = `${fullPath}/${cfg.stackName}-${packagedTemplateFileSuffix}.yaml`
               cfg._deployedTemplateFile = `${fullPath}/${cfg.stackName}-${deployedTemplateFileSuffix}.yaml`
-              cfg._awsCredentialsObject = _initAwsCredentials(cfg)
               delete cfg.stacks
               resolve(cfg)
             })
@@ -313,97 +299,20 @@ module.exports = _utils = {
           cfg.template = cfg.stacks[cmdOpts.stack].template
           cfg._packagedTemplateFile = `${fullPath}/${cfg.stackName}-${packagedTemplateFileSuffix}.yaml`
           cfg._deployedTemplateFile = `${fullPath}/${cfg.stackName}-${deployedTemplateFileSuffix}.yaml`
-          cfg._awsCredentialsObject = _initAwsCredentials(cfg)
           delete cfg.stacks
           return cfg
         }
       } else {
         cfg._packagedTemplateFile = `${fullPath}/${cfg.stackName}-${packagedTemplateFileSuffix}.yaml`
         cfg._deployedTemplateFile = `${fullPath}/${cfg.stackName}-${deployedTemplateFileSuffix}.yaml`
-        cfg._awsCredentialsObject = _initAwsCredentials(cfg)
         return cfg
       }
     })
   },
 
-  tokens: {
-    get: (email=null) => {
-      try {
-        let tokens = JSON.parse(fs.readFileSync(`${TOKEN_DIR}/${TOKEN_FILE_NAME}`))
-        if (email) {
-          return (Array.isArray(tokens)) ? tokens.find(t => t.email == email) : null
-        } else {
-          return (Array.isArray(tokens)) ? tokens : []
-        }
-      } catch(e) {
-        return (email) ? null : []
-      }
-    },
-    getDefault: () => {
-      return _utils.tokens.get().find(t => t.default)
-    },
-    save: (email, token, setAsDefault=false) => {
-      let tokens = _utils.tokens.get()
-      if (tokens.length == 0) {
-        // make sure path where tokens are saved exists
-        try {
-          fs.mkdirSync(TOKEN_DIR)
-        } catch(e) { }
-      }
-
-      if (setAsDefault === true) {
-        // there can only be one default token
-        tokens = tokens.map(t => {
-          t.default = false
-          return t
-        })
-      }
-
-      let idx = tokens.findIndex(elm => elm.email == email)
-      if (idx >= 0) {
-        // edit existing token
-        tokens[idx].token = token
-        tokens[idx].default = setAsDefault === true
-      }
-      else {
-        // add new token to list
-        tokens.push({
-          email,
-          token,
-          default: setAsDefault === true
-        })
-      }
-      fs.writeFileSync(`${TOKEN_DIR}/${TOKEN_FILE_NAME}`, JSON.stringify(tokens, null, 2))
-    }
-  },
-
-  prefs: {
-    get: () => {
-      try {
-        return JSON.parse(fs.readFileSync(`${PREFS_DIR}/${PREFS_FILE_NAME}`))
-      } catch(e) {
-        return {}
-      }
-    },
-    set: (newPrefs) => {
-      let prefs = _utils.prefs.get()
-      if (Object.keys(prefs).length == 0) {
-        // make sure path where prefs are saved exists
-        try {
-          fs.mkdirSync(PREFS_DIR)
-        } catch(e) { }
-      }
-      Object.assign(prefs, newPrefs)
-      fs.writeFileSync(`${PREFS_DIR}/${PREFS_FILE_NAME}`, JSON.stringify(prefs, null, 2))
-    },
-    getFilePath: () => {
-      return `${PREFS_DIR}/${PREFS_FILE_NAME}`
-    }
-  },
-
   getWorkingStackTemplate: (config) => {
     try {
-      let template = yaml.safeLoad(
+      let template = yaml.load(
         fs.readFileSync(config.template, 'utf8'),
         { schema: require('cloudformation-schema-js-yaml') }
       )
@@ -413,56 +322,56 @@ module.exports = _utils = {
     }
   },
 
-  confirmStackExists: (CFclient, stackName) => {
-    // Don't have a previous version of deployed template,
-    // Check if the stack exists and fetch current template if so
-    function _fetchStackList(callback, NextToken=null) {
-      let listParams = {
-        StackStatusFilter: [
-          'CREATE_IN_PROGRESS',
-          'CREATE_FAILED',
-          'CREATE_COMPLETE',
-          'ROLLBACK_IN_PROGRESS',
-          'ROLLBACK_FAILED',
-          'ROLLBACK_COMPLETE',
-          'UPDATE_IN_PROGRESS',
-          'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS',
-          'UPDATE_COMPLETE',
-          'UPDATE_ROLLBACK_IN_PROGRESS',
-          'UPDATE_ROLLBACK_FAILED',
-          'UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS',
-          'UPDATE_ROLLBACK_COMPLETE',
-          'REVIEW_IN_PROGRESS'
-        ]
-      }
-      if (NextToken) listParams.NextToken = NextToken
-      CFclient.listStacks(listParams, callback)
-    }
+  // confirmStackExists: (CFclient, stackName) => {
+  //   // Don't have a previous version of deployed template,
+  //   // Check if the stack exists and fetch current template if so
+  //   function _fetchStackList(callback, NextToken=null) {
+  //     let listParams = {
+  //       StackStatusFilter: [
+  //         'CREATE_IN_PROGRESS',
+  //         'CREATE_FAILED',
+  //         'CREATE_COMPLETE',
+  //         'ROLLBACK_IN_PROGRESS',
+  //         'ROLLBACK_FAILED',
+  //         'ROLLBACK_COMPLETE',
+  //         'UPDATE_IN_PROGRESS',
+  //         'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS',
+  //         'UPDATE_COMPLETE',
+  //         'UPDATE_ROLLBACK_IN_PROGRESS',
+  //         'UPDATE_ROLLBACK_FAILED',
+  //         'UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS',
+  //         'UPDATE_ROLLBACK_COMPLETE',
+  //         'REVIEW_IN_PROGRESS'
+  //       ]
+  //     }
+  //     if (NextToken) listParams.NextToken = NextToken
+  //     CFclient.listStacks(listParams, callback)
+  //   }
 
-    return new Promise((resolve, reject) => {
-      function _onStackList(err, data) {
-        if (err) reject(err)
-        else {
-          if (data.StackSummaries.filter(s => s.StackName == stackName).length > 0) {
-            resolve(true)
-          } else if (data.NextToken) {
-            // stack not found yet but there are more
-            _fetchStackList(_onStackList, data.NextToken)
-          } else {
-            // the stack doesn't exist on CloudFormation
-            resolve(false)
-          }
-        }
-      }
+  //   return new Promise((resolve, reject) => {
+  //     function _onStackList(err, data) {
+  //       if (err) reject(err)
+  //       else {
+  //         if (data.StackSummaries.filter(s => s.StackName == stackName).length > 0) {
+  //           resolve(true)
+  //         } else if (data.NextToken) {
+  //           // stack not found yet but there are more
+  //           _fetchStackList(_onStackList, data.NextToken)
+  //         } else {
+  //           // the stack doesn't exist on CloudFormation
+  //           resolve(false)
+  //         }
+  //       }
+  //     }
 
-      _fetchStackList(_onStackList)
-    })
-  },
+  //     _fetchStackList(_onStackList)
+  //   })
+  // },
 
   getCurrentStackTemplate: (CFclient, config, useLocalCopy=false) => {
     try {
       if (useLocalCopy) {
-        let template = yaml.safeLoad(
+        let template = yaml.load(
           fs.readFileSync(config._deployedTemplateFile, 'utf8'),
           { schema: require('cloudformation-schema-js-yaml') }
         )
@@ -471,41 +380,40 @@ module.exports = _utils = {
         throw new Error('Not using local of deployed template')
       }
     } catch (e) {
-      return new Promise((resolve, reject) => {
-        CFclient.getTemplate({
-          StackName: config.stackName,
-          TemplateStage: 'Original'
-        }, (err, data) => {
-          if (err && err.statusCode == 400 && err.code == 'ValidationError') {
-            // that's the error we get when no stack by this name exist
-            resolve(null)
-          } else if (err) {
-            reject(err)
-          } else {
-            resolve(yaml.safeLoad(
-              data.TemplateBody,
-              { schema: require('cloudformation-schema-js-yaml') }
-            ))
-          }
-        })
+      let cfCmd = new GetTemplateCommand({
+        StackName: config.stackName,
+        TemplateStage: 'Original'
+      })
+      return CFclient.send(cfCmd)
+      .then(data => {
+        if (data['$metadata'].httpStatusCode == 400 && data.Code == 'ValidationError') {
+          // that's the error we get when no stack by this name exist
+          return null
+        } else {
+          return yaml.load(
+            data.TemplateBody,
+            { schema: require('cloudformation-schema-js-yaml') }
+          )
+        }
+      })
+      .catch(err => {
+        if (err['$metadata'].httpStatusCode == 400 && err.Code == 'ValidationError') return null
       })
     }
   },
 
   getStackDescription: (CFclient, stackName) => {
-    return new Promise((resolve, reject) => {
-      CFclient.describeStacks({
-        StackName: stackName
-      }, (err, data) => {
-        if (err && err.statusCode == 400 && err.code == 'ValidationError') {
-          // that's the error we get when no stack by this name exist
-          resolve(null)
-        } else if (err) {
-          reject(err)
-        } else {
-          resolve(data.Stacks.find(s => s.StackName == stackName) || null)
-        }
-      })
+    let cfCmd = new DescribeStacksCommand({
+      StackName: stackName
+    })
+    return CFclient.send(cfCmd)
+    .then((data) => {
+      if (data['$metadata'].httpStatusCode == 400 && data.Code == 'ValidationError') {
+        // that's the error we get when no stack by this name exist
+        return null
+      } else {
+        return data.Stacks.find(s => s.StackName == stackName) || null
+      }
     })
   },
 
@@ -534,29 +442,6 @@ module.exports = _utils = {
       return {
         type: null,
         packages: null
-      }
-    }
-  },
-
-  announce: (messageKey, message, noRepeatPeriod = 60*1000, delayUntilFirst = 0) => {
-    let announcementsFile = path.normalize(`${__dirname}/..`) + '/.announcements'
-    try {
-      let timestamps = JSON.parse(fs.readFileSync(announcementsFile))
-      let writeFile = false
-      if (!(messageKey in timestamps)) {
-        timestamps[messageKey] = (delayUntilFirst > 0) ? Date.now() - noRepeatPeriod + delayUntilFirst : 0
-        writeFile = true
-      }
-      if (timestamps[messageKey] + noRepeatPeriod < Date.now()) {
-        _utils.stdout(message,{mode:_utils.STDOUT_MODES.PARAGRAPH})
-        timestamps[messageKey] = Date.now()
-        writeFile = true
-      }
-      if (writeFile) fs.writeFileSync(announcementsFile, JSON.stringify(timestamps))
-    } catch (err) {
-      if (err.code === 'ENOENT') {
-        fs.writeFileSync(announcementsFile, JSON.stringify({}))
-        return _utils.announce(messageKey, message, noRepeatPeriod, delayUntilFirst)
       }
     }
   },

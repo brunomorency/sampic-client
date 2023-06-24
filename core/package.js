@@ -1,6 +1,7 @@
 'use strict'
 
-const AWS = require('aws-sdk')
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const { fromIni } = require("@aws-sdk/credential-providers")
 const path = require('path')
 const fs = require('fs')
 const utils = require('./utils')
@@ -70,12 +71,14 @@ module.exports = function run(config) {
 
     // upload deployable template to S3 bucket
 
-    let s3Config = {}
-    if (config._awsCredentialsObject) {
-      s3Config.credentials = config._awsCredentialsObject
+    let s3Config = {
+      region: config.region
+    }
+    if (config.profile) {
+      s3Config.credentials = fromIni({profile: config.profile})
     }
 
-    let s3 = new AWS.S3(s3Config)
+    let s3 = new S3Client(s3Config)
     let params = {
       Bucket: config.s3Bucket,
       Key: `templates/${(new Date()).toISOString().replace(/[^\d]/gi,'')}-${path.basename(config.template)}`,
@@ -84,7 +87,8 @@ module.exports = function run(config) {
 
     utils.stdout(`Uploading deployable template to ${chalk.yellow(`s3://${params.Bucket}/${params.Key}`)}`, {level:2})
 
-    return s3.putObject(params).promise()
+    let s3Cmd = new PutObjectCommand(params)
+    return s3.send(s3Cmd)
     .then(s3Response => ({
       bucket: params.Bucket,
       key: params.Key

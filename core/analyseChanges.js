@@ -1,9 +1,9 @@
 'use strict'
 
 const utils = require('./utils')
-const fs = require('fs')
 const { diff } = require('deep-diff')
-const AWS = require('aws-sdk')
+const { CloudFormationClient } = require("@aws-sdk/client-cloudformation")
+const { fromIni } = require("@aws-sdk/credential-providers")
 
 module.exports = function run(config, templates) {
 
@@ -12,11 +12,11 @@ module.exports = function run(config, templates) {
   let cfConfig = {
     region: config.region
   }
-  if (config._awsCredentialsObject) {
-    cfConfig.credentials = config._awsCredentialsObject
+  if (config.profile) {
+    cfConfig.credentials = fromIni({profile: config.profile})
   }
 
-  let cf = new AWS.CloudFormation(cfConfig)
+  let cf = new CloudFormationClient(cfConfig)
 
   function _getUpdatedStackParams() {
     utils.stdout('Retrieving current stack parameters', {level:2})
@@ -52,7 +52,7 @@ module.exports = function run(config, templates) {
       if (notJustLambdas) {
         // Need to do a full stack deploy because there have been changes
         // other than lambda code bundles
-        utils.stdout(`Result: full cloudformation deploy required`,{level:2})
+        utils.stdout(`Result: changes in stack, full cloudformation update required`,{level:2})
         resolve({
           updateType: utils.UPDATE_TYPES.STACK_UPDATE,
           stackChanges
@@ -65,7 +65,7 @@ module.exports = function run(config, templates) {
         _getUpdatedStackParams().then(updatedStackParams => {
           let updateType = null
           if (updatedStackParams.length > 0) {
-            utils.stdout(`Result: changes limited to lambda functions and stack parameters`,{level:2})
+            utils.stdout(`Result: changes in lambda functions and stack parameters`,{level:2})
             updateType = utils.UPDATE_TYPES.LAMBDA_AND_STACK_PARAMS
           } else {
             utils.stdout(`Result: changes limited to lambda functions`,{level:2})

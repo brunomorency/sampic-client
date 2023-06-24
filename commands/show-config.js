@@ -1,6 +1,5 @@
 'use strict'
 
-const prompt = require('prompt')
 const chalk = require('chalk')
 
 module.exports = function run(cmdOpts, core) {
@@ -9,7 +8,7 @@ module.exports = function run(cmdOpts, core) {
   return core.utils.getConfig(cmdOpts)
   .then(config => {
     Object.keys(config).forEach(k => {
-      if (k.substr(0,1) == '_') return false
+      if (k.substring(0,1) == '_') return false
       let spacer = Array.from(Array(Math.ceil((NUM_TABS_TO_VALUE*8 - k.length - 1)/8)), elm => '\t').join('')
       let paramName = chalk.gray(k + ':')
       switch (k) {

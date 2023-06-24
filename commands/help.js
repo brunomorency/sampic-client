@@ -1,21 +1,20 @@
 'use strict'
 
-const prompt = require('prompt')
-const chalk = require('chalk')
 const getUsage = require('command-line-usage')
 
 module.exports = function run(cmdOpts, core) {
 
   const packageInfo = require('../package.json')
+  let cmdName = Object.keys(packageInfo.bin)[0]
 
   console.log(getUsage([
     {
-      header: 'SAMPIC CLI',
+      header: 'SAMPIC',
       content: packageInfo.description
     },
     {
       header: 'Synopsis',
-      content: `$ ${packageInfo.name} [<command>] [<command-options>]`
+      content: `$ ${cmdName} [<command>] [<command-options>]`
     },
     {
       header: 'Commands',
